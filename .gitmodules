@@ -1,0 +1,3 @@
+[submodule "formager"]
+	path = formager
+	url = https://github.com/python-wheel-build/fromager.git

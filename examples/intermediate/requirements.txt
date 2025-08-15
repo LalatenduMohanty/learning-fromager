@@ -1,0 +1,5 @@
+# Example 2: Build multiple packages that might have conflicting dependencies
+requests>=2.25.0
+urllib3>=1.26.0
+
+

@@ -1,0 +1,5 @@
+# Pin specific versions to avoid conflicts
+urllib3==2.2.3
+certifi==2024.8.30
+
+

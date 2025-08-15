@@ -1,0 +1,2 @@
+# Example 3: Build packages from git repositories
+git+https://github.com/pallets/click.git@8.1.7
