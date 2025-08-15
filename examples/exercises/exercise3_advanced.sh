@@ -4,6 +4,14 @@
 echo "=== Exercise 3: Production Build Pipeline ==="
 echo "Goal: Separate discovery and building phases like in CI/CD"
 
+# Check if fromager is available
+if ! command -v fromager &> /dev/null; then
+    echo "Error: fromager is not installed or not in PATH"
+    echo "Please install fromager in your virtual environment first:"
+    echo "  python -m pip install fromager"
+    exit 1
+fi
+
 # Create a realistic web app stack
 cat > requirements.txt << EOF
 fastapi==0.104.0

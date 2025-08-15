@@ -4,6 +4,14 @@
 echo "=== Exercise 4: Parallel Building for Speed ==="
 echo "Goal: Compare serial vs parallel build performance"
 
+# Check if fromager is available
+if ! command -v fromager &> /dev/null; then
+    echo "Error: fromager is not installed or not in PATH"
+    echo "Please install fromager in your virtual environment first:"
+    echo "  python -m pip install fromager"
+    exit 1
+fi
+
 # Create a larger dependency tree for meaningful comparison
 cat > requirements.txt << EOF
 django==4.2.0
@@ -24,7 +32,7 @@ rm -rf wheels-repo sdists-repo work-dir
 
 echo -e "\n=== Method 2: Parallel Bootstrap ==="
 echo "Building with parallel mode..."
-time fromager bootstrap-parallel -r requirements.txt --max-workers 4
+time fromager bootstrap-parallel -r requirements.txt -m 4
 parallel_wheels=$(find wheels-repo -name "*.whl" | wc -l)
 echo "Built $parallel_wheels wheels in parallel"
 
@@ -36,7 +44,7 @@ echo "Phase 1: Discovery only (fast)"
 time fromager bootstrap -r requirements.txt --sdist-only
 
 echo -e "\nPhase 2: Parallel build from graph"
-time fromager build-parallel work-dir/graph.json --max-workers 4
+time fromager build-parallel work-dir/graph.json -m 4
 
 echo -e "\n=== Performance Comparison Complete! ==="
 echo "The parallel methods should be significantly faster for large dependency trees"

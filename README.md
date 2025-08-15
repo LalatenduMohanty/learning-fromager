@@ -1,13 +1,61 @@
-# Fromager Learning Guide: From Novice to Expert
+# Fromager Learning Guide
 
 ## What is Fromager?
 
-Fromager is a tool for completely rebuilding Python package dependency trees from source. It ensures that:
+Fromager is a tool for completely rebuilding Python package dependency trees from source. 
+
+**Official Documentation**: [https://fromager.readthedocs.io/en/latest/](https://fromager.readthedocs.io/en/latest/)
+
+It ensures that:
 
 1. **Every binary package** was built from source in a known environment
 2. **All dependencies** were also built from source (no pre-built wheels)  
 3. **All build tools** used were also built from source
 4. **Builds can be customized** with patches, compilation options, and variants
+
+## Getting Started
+
+### Prerequisites and Installation
+
+Before diving into the examples, you'll need to set up your environment:
+
+#### Quick Setup (Recommended)
+```bash
+# Run the automated setup script
+./setup.sh
+
+# Activate the environment
+source fromager-env/bin/activate
+```
+
+#### Manual Setup
+```bash
+# 1. Create a virtual environment (recommended)
+python -m venv fromager-env
+source fromager-env/bin/activate  # On Windows: fromager-env\Scripts\activate
+
+# 2. Install fromager
+pip install fromager
+
+# 3. Verify installation
+fromager --help
+
+# 4. Optional: Install system dependencies for complex packages
+# On Fedora/RHEL:
+sudo dnf install rust cargo gcc-c++ python3-devel
+# On Ubuntu/Debian:
+sudo apt install build-essential rustc cargo python3-dev
+# On macOS:
+xcode-select --install
+```
+
+### System Requirements
+
+- **Python 3.8+**
+- **Git** (for building from repositories)
+- **System compiler** (gcc, clang, or MSVC)
+- **Rust toolchain** (for Rust-based Python packages)
+- **Network access** (for downloading source packages)
 
 ## Key Concepts
 
@@ -139,14 +187,14 @@ fromager build-sequence \
 
 ```bash
 # Option 1: Bootstrap with automatic parallel building
-fromager bootstrap-parallel -r requirements.txt --max-workers 4
+fromager bootstrap-parallel -r requirements.txt -m 4
 
 # Option 2: Separate phases for maximum control
 # Phase 1: Discover dependencies (serial)
 fromager bootstrap -r requirements.txt --sdist-only
 
 # Phase 2: Build wheels in parallel
-fromager build-parallel work-dir/graph.json --max-workers 4
+fromager build-parallel work-dir/graph.json -m 4
 ```
 
 **Key benefits**:
@@ -296,7 +344,9 @@ fromager build-sequence work-dir/build-order.json
 ## Troubleshooting Common Issues
 
 ### 1. "Why do downloads and builds look identical?"
+
 **Question**: The `sdists-repo/downloads/` and `sdists-repo/builds/` contain the same files
+
 **Answer**: This is **normal** for simple packages without patches or special build requirements
 
 ```bash
@@ -312,7 +362,9 @@ $ ls -lh sdists-repo/builds/pydantic_core-*     # ~15MB with vendored deps
 ```
 
 ### 2. Package Fails to Build
+
 **Problem**: Complex package with system dependencies
+
 **Solution**: Mark as pre-built temporarily
 
 ```yaml
@@ -321,8 +373,10 @@ pre_built: true
 pre_built_url: "https://files.pythonhosted.org/packages/.../package.whl"
 ```
 
-### 2. Version Conflicts
+### 3. Version Conflicts
+
 **Problem**: Multiple packages want different versions of same dependency
+
 **Solution**: Use constraints.txt
 
 ```txt
@@ -330,8 +384,10 @@ pre_built_url: "https://files.pythonhosted.org/packages/.../package.whl"
 conflicting-package==1.2.3
 ```
 
-### 3. Missing System Dependencies
+### 4. Missing System Dependencies
+
 **Problem**: Package needs system libraries (like Rust, C++ compiler)
+
 **Solution**: Install system deps or use containers
 
 ```bash
@@ -357,3 +413,9 @@ fromager bootstrap -r requirements.txt
 - Keep your `overrides/` directory in version control
 - Monitor build times and optimize bottlenecks
 - Use `fromager stats` to analyze your builds
+
+---
+
+## Acknowledgments
+
+This learning guide was enhanced with assistance from **Cursor AI** and **Claude-4-Sonnet** 

@@ -9,7 +9,16 @@ pydantic-core==2.18.4
 EOF
 
 echo "Building pydantic-core (Rust package that vendors dependencies)..."
-source ../../venv/bin/activate
+
+# Check if fromager is available
+if ! command -v fromager &> /dev/null; then
+    echo "Error: fromager is not installed or not in PATH"
+    echo "Please install fromager in your virtual environment first:"
+    echo "  python -m pip install fromager"
+    echo "Or activate your virtual environment where fromager is installed."
+    exit 1
+fi
+
 fromager bootstrap -r requirements.txt
 
 echo -e "\n=== Comparing sdist sizes ==="

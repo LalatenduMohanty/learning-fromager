@@ -4,6 +4,14 @@
 echo "=== Exercise 2: Data Science Stack with Constraints ==="
 echo "Goal: Build pandas stack while managing version conflicts"
 
+# Check if fromager is available
+if ! command -v fromager &> /dev/null; then
+    echo "Error: fromager is not installed or not in PATH"
+    echo "Please install fromager in your virtual environment first:"
+    echo "  python -m pip install fromager"
+    exit 1
+fi
+
 # Create requirements with potential conflicts
 cat > requirements.txt << EOF
 pandas>=1.5.0

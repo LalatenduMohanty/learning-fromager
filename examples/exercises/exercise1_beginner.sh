@@ -4,6 +4,14 @@
 echo "=== Exercise 1: Building Flask from Source ==="
 echo "Goal: Build Flask and understand dependency resolution"
 
+# Check if fromager is available
+if ! command -v fromager &> /dev/null; then
+    echo "Error: fromager is not installed or not in PATH"
+    echo "Please install fromager in your virtual environment first:"
+    echo "  python -m pip install fromager"
+    exit 1
+fi
+
 # Create requirements
 cat > requirements.txt << EOF
 Flask==3.0.0
