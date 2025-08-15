@@ -4,7 +4,8 @@
 
 Fromager is a tool for completely rebuilding Python package dependency trees from source. 
 
-**Official Documentation**: [https://fromager.readthedocs.io/en/latest/](https://fromager.readthedocs.io/en/latest/)
+**Official Documentation**: [https://fromager.readthedocs.io/en/latest/](https://fromager.readthedocs.io/en/latest/)  
+**Source Code**: [https://github.com/python-wheel-build/fromager](https://github.com/python-wheel-build/fromager)
 
 It ensures that:
 
