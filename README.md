@@ -133,7 +133,7 @@ charset-normalizer==3.3.0
 EOF
 
 # Bootstrap with constraints
-fromager bootstrap -r requirements.txt -c constraints.txt
+fromager -c constraints.txt bootstrap -r requirements.txt
 ```
 
 **Key learnings**:
@@ -149,8 +149,8 @@ fromager bootstrap -r requirements.txt -c constraints.txt
 ```bash
 # requirements.txt with git URLs
 cat > requirements.txt << EOF
-git+https://github.com/pallets/click.git@8.1.7
-git+https://github.com/psf/requests.git@v2.32.0
+click @  git+https://github.com/pallets/click.git@8.1.7
+requests @ git+https://github.com/psf/requests.git@v2.32.0
 EOF
 
 fromager bootstrap -r requirements.txt
