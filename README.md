@@ -52,7 +52,7 @@ xcode-select --install
 
 ### System Requirements
 
-- **Python 3.8+**
+- **Python 3.11+** (required by Fromager)
 - **Git** (for building from repositories)
 - **System compiler** (gcc, clang, or MSVC)
 - **Rust toolchain** (for Rust-based Python packages)

@@ -8,10 +8,11 @@ echo "=== Fromager Learning Environment Setup ==="
 
 # Check Python version
 python_version=$(python3 --version 2>&1 | grep -oE '[0-9]+\.[0-9]+')
-min_version="3.8"
+min_version="3.11"
 
 if [ "$(printf '%s\n' "$min_version" "$python_version" | sort -V | head -n1)" != "$min_version" ]; then
-    echo "Error: Python 3.8+ is required. Found: $python_version"
+    echo "Error: Python 3.11+ is required for Fromager. Found: $python_version"
+    echo "Please install Python 3.11 or later to use Fromager."
     exit 1
 fi
 
