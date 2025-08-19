@@ -194,15 +194,24 @@ fromager bootstrap -r requirements.txt
 
 ### 4. Advanced: Single Package Build
 
-**Goal**: Build just one package with full control
+**Goal**: Build just one package when you already have its dependencies
+
+**When to use**: After bootstrapping dependencies, or when testing specific package versions
 
 ```bash
-# Build a specific package version
-fromager build click 8.1.7 https://pypi.org/simple/
+# First, you need to build the dependencies (setuptools for click)
+echo "setuptools" > requirements.txt
+echo "setuptools==80.9.0" > constraints.txt
+fromager bootstrap -r requirements.txt -c constraints.txt
 
-# The wheel appears in wheels-repo/build/
-ls wheels-repo/build/click-*
+# Now build a specific package version using the built dependencies
+fromager --no-network-isolation build click 8.1.7 https://pypi.org/simple/
+
+# The wheel appears in wheels-repo/downloads/
+ls wheels-repo/downloads/click-*
 ```
+
+**Key difference**: `build` command builds only the specified package, while `bootstrap` discovers and builds all dependencies recursively. The `build` command expects build dependencies to already be available.
 
 ### 5. Advanced: Production Build Sequence
 
@@ -210,7 +219,7 @@ ls wheels-repo/build/click-*
 
 ```bash
 # First, generate build order
-fromager bootstrap -r requirements.txt --sdist-only
+fromager bootstrap -r requirements.txt -c constraints.txt --sdist-only
 
 # Then build in sequence (production)
 fromager build-sequence \
@@ -224,11 +233,11 @@ fromager build-sequence \
 
 ```bash
 # Option 1: Bootstrap with automatic parallel building
-fromager bootstrap-parallel -r requirements.txt -m 4
+fromager bootstrap-parallel -r requirements.txt -c constraints.txt -m 4
 
 # Option 2: Separate phases for maximum control
 # Phase 1: Discover dependencies (serial)
-fromager bootstrap -r requirements.txt --sdist-only
+fromager bootstrap -r requirements.txt -c constraints.txt --sdist-only
 
 # Phase 2: Build wheels in parallel
 fromager build-parallel work-dir/graph.json -m 4
