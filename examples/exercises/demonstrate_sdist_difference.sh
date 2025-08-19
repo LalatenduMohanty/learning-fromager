@@ -5,6 +5,10 @@ echo "=== Demonstrating sdists-repo/downloads vs builds difference ==="
 
 # Let's build a Rust package that vendors dependencies
 cat > requirements.txt << EOF
+pydantic-core
+EOF
+
+cat > constraints.txt << EOF
 pydantic-core==2.18.4
 EOF
 
@@ -19,7 +23,7 @@ if ! command -v fromager &> /dev/null; then
     exit 1
 fi
 
-fromager bootstrap -r requirements.txt
+fromager bootstrap -r requirements.txt -c constraints.txt
 
 echo -e "\n=== Comparing sdist sizes ==="
 echo "Original download:"

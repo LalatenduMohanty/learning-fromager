@@ -12,19 +12,21 @@ if ! command -v fromager &> /dev/null; then
     exit 1
 fi
 
-# Create requirements with potential conflicts
+# Create requirements (package names only)
 cat > requirements.txt << EOF
-pandas>=1.5.0
-numpy>=1.21.0
-matplotlib>=3.5.0
-scipy>=1.9.0
+pandas
+numpy
+matplotlib
+scipy
 EOF
 
-# Create constraints to resolve conflicts
+# Create constraints (all version specifications)
 cat > constraints.txt << EOF
 # Pin specific versions to avoid conflicts
+pandas>=1.5.0
 numpy==1.24.0
 matplotlib==3.6.0
+scipy>=1.9.0
 pyparsing==3.0.9
 EOF
 

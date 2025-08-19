@@ -67,6 +67,37 @@ xcode-select --install
 - **Constraints**: Version pinning to resolve conflicts
 - **Variants**: Different build configurations (e.g., cpu, gpu)
 
+### Requirements vs Constraints
+
+Understanding the difference between `requirements.txt` and `constraints.txt` is crucial for effective dependency management:
+
+**Requirements (`requirements.txt`)**
+- **What you want to build**: Lists only package names (no versions)
+- **Example**: `requests`, `flask`, `beautifulsoup4`
+- **Purpose**: "I need these packages for my application"
+
+**⚖️ Constraints (`constraints.txt`)**
+- **How to resolve versions**: All version specifications go here
+- **Example**: `requests>=2.25.0`, `urllib3==2.2.3`, `certifi==2024.8.30`
+- **Purpose**: "When installing any package, use these version constraints"
+
+**Why separate them?**
+```bash
+# requirements.txt - Package names only
+requests
+beautifulsoup4
+flask
+
+# constraints.txt - All version constraints
+requests>=2.25.0
+beautifulsoup4>=4.9.0
+urllib3==2.2.3
+certifi==2024.8.30
+soupsieve==2.5
+```
+
+This keeps your dependency declarations clean while providing precise control over transitive dependencies that might conflict.
+
 ## Main CLI Commands
 
 | Command | Purpose | Use Case |
@@ -85,11 +116,14 @@ xcode-select --install
 **Goal**: Build a simple package and understand the basic flow
 
 ```bash
-# Create requirements.txt
-echo "click==8.1.7" > requirements.txt
+# Create requirements.txt (package names only)
+echo "click" > requirements.txt
+
+# Create constraints.txt (version specifications)
+echo "click==8.1.7" > constraints.txt
 
 # Bootstrap (builds click and setuptools from source)
-fromager bootstrap -r requirements.txt
+fromager bootstrap -r requirements.txt -c constraints.txt
 
 # Examine results
 ls wheels-repo/downloads/  # Built wheels
@@ -118,16 +152,18 @@ ls -la sdists-repo/builds/
 **Goal**: Handle version conflicts and complex dependencies
 
 ```bash
-# requirements.txt
+# requirements.txt (package names only)
 cat > requirements.txt << EOF
-requests>=2.25.0
-urllib3>=1.26.0
-beautifulsoup4>=4.9.0
+requests
+urllib3
+beautifulsoup4
 EOF
 
-# constraints.txt - Pin versions to avoid conflicts
+# constraints.txt (all version specifications)
 cat > constraints.txt << EOF
+requests>=2.25.0
 urllib3==2.2.3
+beautifulsoup4>=4.9.0
 certifi==2024.8.30
 charset-normalizer==3.3.0
 EOF
@@ -147,7 +183,7 @@ fromager bootstrap -r requirements.txt -c constraints.txt
 **Goal**: Build packages from source control instead of PyPI
 
 ```bash
-# requirements.txt with git URLs
+# requirements.txt (git packages)
 cat > requirements.txt << EOF
 git+https://github.com/pallets/click.git@8.1.7
 git+https://github.com/psf/requests.git@v2.32.0
@@ -356,8 +392,9 @@ $ ls sdists-repo/downloads/ sdists-repo/builds/
 # click-8.1.7.tar.gz appears in both directories
 
 # To see real differences, try a Rust package:
-$ echo "pydantic-core==2.18.4" > requirements.txt
-$ fromager bootstrap -r requirements.txt
+$ echo "pydantic-core" > requirements.txt
+$ echo "pydantic-core==2.18.4" > constraints.txt
+$ fromager bootstrap -r requirements.txt -c constraints.txt
 $ ls -lh sdists-repo/downloads/pydantic_core-*  # ~500KB original
 $ ls -lh sdists-repo/builds/pydantic_core-*     # ~15MB with vendored deps
 ```

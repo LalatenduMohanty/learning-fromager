@@ -14,6 +14,14 @@ fi
 
 # Create a larger dependency tree for meaningful comparison
 cat > requirements.txt << EOF
+django
+requests
+sqlalchemy
+click
+jinja2
+EOF
+
+cat > constraints.txt << EOF
 django==4.2.0
 requests==2.31.0
 sqlalchemy==2.0.0
@@ -23,7 +31,7 @@ EOF
 
 echo "=== Method 1: Traditional Bootstrap (Serial) ==="
 echo "Building serially..."
-time fromager bootstrap -r requirements.txt
+time fromager bootstrap -r requirements.txt -c constraints.txt
 serial_wheels=$(find wheels-repo -name "*.whl" | wc -l)
 echo "Built $serial_wheels wheels serially"
 
@@ -32,7 +40,7 @@ rm -rf wheels-repo sdists-repo work-dir
 
 echo -e "\n=== Method 2: Parallel Bootstrap ==="
 echo "Building with parallel mode..."
-time fromager bootstrap-parallel -r requirements.txt -m 4
+time fromager bootstrap-parallel -r requirements.txt -c constraints.txt -m 4
 parallel_wheels=$(find wheels-repo -name "*.whl" | wc -l)
 echo "Built $parallel_wheels wheels in parallel"
 
@@ -41,7 +49,7 @@ echo -e "\n=== Method 3: Two-Phase Parallel Build ==="
 rm -rf wheels-repo sdists-repo work-dir
 
 echo "Phase 1: Discovery only (fast)"
-time fromager bootstrap -r requirements.txt --sdist-only
+time fromager bootstrap -r requirements.txt -c constraints.txt --sdist-only
 
 echo -e "\nPhase 2: Parallel build from graph"
 time fromager build-parallel work-dir/graph.json -m 4

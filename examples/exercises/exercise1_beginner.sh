@@ -12,13 +12,18 @@ if ! command -v fromager &> /dev/null; then
     exit 1
 fi
 
-# Create requirements
+# Create requirements (package names only)
 cat > requirements.txt << EOF
+Flask
+EOF
+
+# Create constraints (version specifications)
+cat > constraints.txt << EOF
 Flask==3.0.0
 EOF
 
 echo "1. Building Flask and all dependencies from source..."
-fromager bootstrap -r requirements.txt
+fromager bootstrap -r requirements.txt -c constraints.txt
 
 echo "2. Examining results..."
 echo "Built wheels:"
