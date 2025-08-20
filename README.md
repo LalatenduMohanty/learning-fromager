@@ -258,6 +258,19 @@ fromager build-parallel work-dir/graph.json -m 4
 **Real-world example**: [pytest-asyncio v1.1.0](https://github.com/pytest-dev/pytest-asyncio/releases/tag/v1.1.0) fails to build due to obsolete setup.cfg configuration conflicts with modern setuptools_scm.
 
 ```bash
+# Build the pytest-asyncio 1.1.0 version
+# We expect it to fail
+echo "pytest-asyncio" > requirements.txt
+echo "pytest-asyncio==1.1.0" > constraints.txt
+
+echo "=== This will fail without patches ==="
+fromager bootstrap -r requirements.txt -c constraints.txt
+
+# Expected error: setuptools_scm configuration conflicts
+# Error related to obsolete setup.cfg and write_to parameter
+```
+
+```bash
 # Create overrides directory structure
 mkdir -p overrides/patches overrides/settings
 
