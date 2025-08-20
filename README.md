@@ -2,15 +2,15 @@
 
 ## What is Fromager?
 
-Fromager is a tool for completely rebuilding Python package dependency trees from source. 
+Fromager is a tool for completely rebuilding Python package dependency trees from source.
 
-**Official Documentation**: [https://fromager.readthedocs.io/en/latest/](https://fromager.readthedocs.io/en/latest/)  
+**Official Documentation**: [https://fromager.readthedocs.io/en/latest/](https://fromager.readthedocs.io/en/latest/)
 **Source Code**: [https://github.com/python-wheel-build/fromager](https://github.com/python-wheel-build/fromager)
 
 It ensures that:
 
 1. **Every binary package** was built from source in a known environment
-2. **All dependencies** were also built from source (no pre-built wheels)  
+2. **All dependencies** were also built from source (no pre-built wheels)
 3. **All build tools** used were also built from source
 4. **Builds can be customized** with patches, compilation options, and variants
 
@@ -33,7 +33,7 @@ source fromager-env/bin/activate
 ```bash
 # 1. Create a virtual environment (recommended)
 python -m venv fromager-env
-source fromager-env/bin/activate  # On Windows: fromager-env\Scripts\activate
+source fromager-env/bin/activate # On Windows: fromager-env\Scripts\activate
 
 # 2. Install fromager
 pip install fromager
@@ -126,16 +126,16 @@ echo "click==8.1.7" > constraints.txt
 fromager bootstrap -r requirements.txt -c constraints.txt
 
 # Examine results
-ls wheels-repo/downloads/  # Built wheels
-ls sdists-repo/downloads/  # Downloaded source distributions
-cat work-dir/build-order.json  # Build order determined
+ls wheels-repo/downloads/ # Built wheels
+ls sdists-repo/downloads/ # Downloaded source distributions
+cat work-dir/build-order.json # Build order determined
 ```
 
 **What happens**:
 1. Downloads `click-8.1.7.tar.gz` source → `sdists-repo/downloads/`
 2. Discovers it needs `setuptools` to build
 3. Builds `setuptools` first, then `click`
-4. Rebuilds source distributions → `sdists-repo/builds/` 
+4. Rebuilds source distributions → `sdists-repo/builds/`
 5. Creates wheels in `wheels-repo/`
 6. Generates build order for reproducible builds
 
@@ -222,9 +222,12 @@ ls wheels-repo/downloads/click-*
 fromager bootstrap -r requirements.txt -c constraints.txt --sdist-only
 
 # Then build in sequence (production)
-fromager build-sequence \
-  --wheel-server-url http://your-wheel-server/ \
-  work-dir/build-order.json
+fromager build-sequence work-dir/build-order.json
+
+# Optional: Use external wheel server for production
+# fromager build-sequence \
+#   --wheel-server-url http://your-wheel-server/ \
+#   work-dir/build-order.json
 ```
 
 ### 6. Advanced: Parallel Building for Performance
@@ -252,53 +255,90 @@ fromager build-parallel work-dir/graph.json -m 4
 
 **Goal**: Handle packages that need patches or special build settings
 
+**Real-world example**: [pytest-asyncio v1.1.0](https://github.com/pytest-dev/pytest-asyncio/releases/tag/v1.1.0) fails to build due to obsolete setup.cfg configuration conflicts with modern setuptools_scm.
+
 ```bash
 # Create overrides directory structure
 mkdir -p overrides/patches overrides/settings
 
-# Example: Patch a package
-cat > overrides/patches/problematic-package.patch << EOF
---- a/setup.py
-+++ b/setup.py
-@@ -10,7 +10,7 @@
-     install_requires=[
--        'old-dependency',
-+        'new-dependency',
-     ],
+# Create requirements and constraints for pytest-asyncio
+echo "pytest-asyncio" > requirements.txt
+echo "pytest-asyncio==1.1.0" > constraints.txt
+
+# This will fail without patches:
+# fromager bootstrap -r requirements.txt -c constraints.txt
+
+# Create version-specific patch directory (using override name format)
+mkdir -p overrides/patches/pytest_asyncio-1.1.0
+
+# Create the patch to fix build issues
+cat > overrides/patches/pytest_asyncio-1.1.0/0001-remove-obsolete-setup-cfg.patch << 'EOF'
+diff --git a/pyproject.toml b/pyproject.toml
+index 1234567..abcdefg 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -67,7 +67,6 @@ packages = [
+ include-package-data = true
+
+ [tool.setuptools_scm]
+- write_to = "pytest_asyncio/_version.py"
+ local_scheme = "no-local-version"
+
+ [tool.ruff]
+@@ -138,9 +137,6 @@ source = [
+ ]
+ branch = true
+ data_file = "coverage/coverage"
+- omit = [
+- "*/_version.py",
+- ]
+ parallel = true
+
+ [tool.coverage.report]
+diff --git a/setup.cfg b/setup.cfg
+deleted file mode 100644
+index 1234567..0000000
+--- a/setup.cfg
++++ /dev/null
+@@ -1,7 +0,0 @@
+- [metadata]
+- version = attr: pytest_asyncio.__version__
+- 
+- [egg_info]
+- tag_build = 
+- tag_date = 0
+- 
 EOF
 
-# Package-specific settings
-cat > overrides/settings/problematic-package.yaml << EOF
-pre_built: false
-patches:
-  - problematic-package.patch
-environment:
-  CFLAGS: "-O2"
-EOF
-
-fromager bootstrap -r requirements.txt
+# Now it will build successfully with the patch applied
+fromager bootstrap -r requirements.txt -c constraints.txt
 ```
+
+**What the patch fixes**:
+- Removes obsolete `setup.cfg` that conflicts with `pyproject.toml`
+- Removes deprecated `write_to` parameter from setuptools_scm configuration
+- Cleans up version handling conflicts between old and new packaging approaches
 
 ## Directory Structure After Running Fromager
 
 ```
 .
-├── requirements.txt          # Your input requirements
-├── constraints.txt          # Version constraints (optional)
-├── overrides/              # Customization (advanced)
-│   ├── patches/           # Source code patches
-│   └── settings/          # Per-package build settings
-├── sdists-repo/           # Source distributions
-│   ├── downloads/         # Downloaded from PyPI/git
-│   └── builds/           # Rebuilt with patches applied
-├── wheels-repo/          # Built wheels
-│   ├── downloads/        # Final wheels
-│   ├── build/           # Intermediate builds
-│   └── simple/          # PyPI-compatible index
-└── work-dir/            # Temporary build files
+├── requirements.txt # Your input requirements
+├── constraints.txt # Version constraints (optional)
+├── overrides/ # Customization (advanced)
+│   ├── patches/ # Source code patches
+│   └── settings/ # Per-package build settings
+├── sdists-repo/ # Source distributions
+│   ├── downloads/ # Downloaded from PyPI/git
+│   └── builds/ # Rebuilt with patches applied
+├── wheels-repo/ # Built wheels
+│   ├── downloads/ # Final wheels
+│   ├── build/ # Intermediate builds
+│   └── simple/ # PyPI-compatible index
+└── work-dir/ # Temporary build files
     ├── build-order.json # Dependency build order
-    ├── constraints.txt  # Generated constraints
-    └── package-*/       # Build directories
+    ├── constraints.txt # Generated constraints
+    └── package-*/ # Build directories
 ```
 
 ### Understanding `sdists-repo/downloads` vs `sdists-repo/builds`
@@ -465,4 +505,4 @@ fromager bootstrap -r requirements.txt
 
 ## Acknowledgments
 
-This learning guide was enhanced with assistance from **Cursor AI** and **Claude-4-Sonnet** 
+This learning guide was enhanced with assistance from **Cursor AI** and **Claude-4-Sonnet**
