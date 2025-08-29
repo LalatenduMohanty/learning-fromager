@@ -30,8 +30,10 @@ source fromager-env/bin/activate
 echo "Upgrading pip..."
 pip install --upgrade pip
 
-# Install fromager
+# Install fromager (includes uv automatically)
 echo "Installing fromager..."
+echo "ℹ️  Note: fromager now uses 'uv' internally for faster build environment management"
+echo "   'uv' will be installed automatically as a dependency"
 pip install fromager
 
 # Verify installation
@@ -44,11 +46,22 @@ else
     exit 1
 fi
 
+if command -v uv &> /dev/null; then
+    echo "✓ uv installed successfully (required for fromager)"
+    uv --version
+else
+    echo "✗ uv installation failed - this is required for fromager to work"
+    exit 1
+fi
+
 echo ""
 echo "=== Setup Complete! ==="
 echo ""
+echo "✓ uv is installed - fromager will automatically use it for faster builds"
+echo ""
 echo "To use fromager:"
 echo "  source fromager-env/bin/activate"
+echo "  fromager --version"
 echo "  fromager --help"
 echo ""
 echo "To run the exercises:"

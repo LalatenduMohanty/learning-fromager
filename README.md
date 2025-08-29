@@ -39,6 +39,7 @@ source fromager-env/bin/activate # On Windows: fromager-env\Scripts\activate
 pip install fromager
 
 # 3. Verify installation
+fromager --version
 fromager --help
 
 # 4. Optional: Install system dependencies for complex packages
@@ -57,6 +58,7 @@ xcode-select --install
 - **System compiler** (gcc, clang, or MSVC)
 - **Rust toolchain** (for Rust-based Python packages)
 - **Network access** (for downloading source packages)
+- **uv** (required - installed automatically with fromager for faster build environment management)
 
 ## Key Concepts
 
