@@ -20,6 +20,8 @@ Python wheels are the modern standard for distributing pre-built Python packages
 
 If you're new to wheels, you can learn more from the Python Packaging Authority's [wheel documentation](https://packaging.python.org/en/latest/specifications/binary-distribution-format/).
 
+A great source for learning how to build Python wheels is the official Python Packaging Authority (PyPA) guide: [Python Packaging User Guide](https://packaging.python.org/en/latest/tutorials/packaging-projects/)
+
 ## Getting Started
 
 ### Prerequisites and Installation
