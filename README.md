@@ -2,7 +2,7 @@
 
 ## What is Fromager?
 
-Fromager is a tool for completely rebuilding Python package dependency trees from source.
+Fromager is a tool for rebuilding Python wheel dependency trees from source, ensuring all binaries, dependencies, and build tools are built in a known environment.
 
 **Official Documentation**: [https://fromager.readthedocs.io/en/latest/](https://fromager.readthedocs.io/en/latest/)
 **Source Code**: [https://github.com/python-wheel-build/fromager](https://github.com/python-wheel-build/fromager)
@@ -13,6 +13,12 @@ It ensures that:
 2. **All dependencies** were also built from source (no pre-built wheels)
 3. **All build tools** used were also built from source
 4. **Builds can be customized** with patches, compilation options, and variants
+
+### Introduction to Python Wheels
+
+Python wheels are the modern standard for distributing pre-built Python packages. A wheel (.whl file) is a binary distribution format that allows for fast, reliable installation without requiring users to build packages from source.
+
+If you're new to wheels, you can learn more from the Python Packaging Authority's [wheel documentation](https://packaging.python.org/en/latest/specifications/binary-distribution-format/).
 
 ## Getting Started
 
