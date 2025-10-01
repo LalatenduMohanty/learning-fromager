@@ -23,7 +23,7 @@ Flask==3.0.0
 EOF
 
 echo "1. Building Flask and all dependencies from source..."
-fromager bootstrap -r requirements.txt -c constraints.txt
+fromager -c constraints.txt bootstrap -r requirements.txt
 
 echo "2. Examining results..."
 echo "Built wheels:"

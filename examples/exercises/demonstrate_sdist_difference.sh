@@ -23,7 +23,7 @@ if ! command -v fromager &> /dev/null; then
     exit 1
 fi
 
-fromager bootstrap -r requirements.txt -c constraints.txt
+fromager -c constraints.txt bootstrap -r requirements.txt
 
 echo -e "\n=== Comparing sdist sizes ==="
 echo "Original download:"
