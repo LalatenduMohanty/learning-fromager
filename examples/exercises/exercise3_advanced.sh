@@ -28,7 +28,7 @@ pydantic==2.5.0
 EOF
 
 echo "Phase 1: Discovery (fast, --sdist-only mode)"
-fromager bootstrap -r requirements.txt -c constraints.txt --sdist-only
+fromager -c constraints.txt bootstrap -r requirements.txt --sdist-only
 
 echo -e "\nPhase 2: Production build sequence"
 fromager build-sequence work-dir/build-order.json

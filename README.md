@@ -133,7 +133,7 @@ echo "click" > requirements.txt
 echo "click==8.1.7" > constraints.txt
 
 # Bootstrap (builds click and setuptools from source)
-fromager bootstrap -r requirements.txt -c constraints.txt
+fromager -c constraints.txt bootstrap -r requirements.txt
 
 # Examine results
 ls wheels-repo/downloads/ # Built wheels
@@ -212,7 +212,7 @@ fromager bootstrap -r requirements.txt
 # First, you need to build the dependencies (setuptools for click)
 echo "setuptools" > requirements.txt
 echo "setuptools==80.9.0" > constraints.txt
-fromager bootstrap -r requirements.txt -c constraints.txt
+fromager -c constraints.txt bootstrap -r requirements.txt
 
 # Now build a specific package version using the built dependencies
 fromager --no-network-isolation build click 8.1.7 https://pypi.org/simple/
@@ -229,7 +229,7 @@ ls wheels-repo/downloads/click-*
 
 ```bash
 # First, generate build order
-fromager bootstrap -r requirements.txt -c constraints.txt --sdist-only
+fromager -c constraints.txt bootstrap -r requirements.txt --sdist-only
 
 # Then build in sequence (production)
 fromager build-sequence work-dir/build-order.json
@@ -246,11 +246,11 @@ fromager build-sequence work-dir/build-order.json
 
 ```bash
 # Option 1: Bootstrap with automatic parallel building
-fromager bootstrap-parallel -r requirements.txt -c constraints.txt -m 4
+fromager -c constraints.txt bootstrap-parallel -r requirements.txt -m 4
 
 # Option 2: Separate phases for maximum control
 # Phase 1: Discover dependencies (serial)
-fromager bootstrap -r requirements.txt -c constraints.txt --sdist-only
+fromager -c constraints.txt bootstrap -r requirements.txt --sdist-only
 
 # Phase 2: Build wheels in parallel
 fromager build-parallel work-dir/graph.json -m 4
@@ -274,7 +274,7 @@ echo "pytest-asyncio" > requirements.txt
 echo "pytest-asyncio==1.1.0" > constraints.txt
 
 echo "=== This will fail without patches ==="
-fromager bootstrap -r requirements.txt -c constraints.txt
+fromager -c constraints.txt bootstrap -r requirements.txt
 
 # Expected error: setuptools_scm configuration conflicts
 # Error related to obsolete setup.cfg and write_to parameter
@@ -289,7 +289,7 @@ echo "pytest-asyncio" > requirements.txt
 echo "pytest-asyncio==1.1.0" > constraints.txt
 
 # This will fail without patches:
-# fromager bootstrap -r requirements.txt -c constraints.txt
+# fromager -c constraints.txt bootstrap -r requirements.txt
 
 # Create version-specific patch directory (using override name format)
 mkdir -p overrides/patches/pytest_asyncio-1.1.0
@@ -334,7 +334,7 @@ index 1234567..0000000
 EOF
 
 # Now it will build successfully with the patch applied
-fromager bootstrap -r requirements.txt -c constraints.txt
+fromager -c constraints.txt bootstrap -r requirements.txt
 ```
 
 **What the patch fixes**:
@@ -466,7 +466,7 @@ $ ls sdists-repo/downloads/ sdists-repo/builds/
 # To see real differences, try a Rust package:
 $ echo "pydantic-core" > requirements.txt
 $ echo "pydantic-core==2.18.4" > constraints.txt
-$ fromager bootstrap -r requirements.txt -c constraints.txt
+$ fromager -c constraints.txt bootstrap -r requirements.txt
 $ ls -lh sdists-repo/downloads/pydantic_core-*  # ~500KB original
 $ ls -lh sdists-repo/builds/pydantic_core-*     # ~15MB with vendored deps
 ```

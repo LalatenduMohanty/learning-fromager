@@ -31,7 +31,7 @@ EOF
 
 echo "=== Method 1: Traditional Bootstrap (Serial) ==="
 echo "Building serially..."
-time fromager bootstrap -r requirements.txt -c constraints.txt
+time fromager -c constraints.txt bootstrap -r requirements.txt
 serial_wheels=$(find wheels-repo -name "*.whl" | wc -l)
 echo "Built $serial_wheels wheels serially"
 
@@ -40,7 +40,7 @@ rm -rf wheels-repo sdists-repo work-dir
 
 echo -e "\n=== Method 2: Parallel Bootstrap ==="
 echo "Building with parallel mode..."
-time fromager bootstrap-parallel -r requirements.txt -c constraints.txt -m 4
+time fromager -c constraints.txt bootstrap-parallel -r requirements.txt -m 4
 parallel_wheels=$(find wheels-repo -name "*.whl" | wc -l)
 echo "Built $parallel_wheels wheels in parallel"
 
@@ -49,7 +49,7 @@ echo -e "\n=== Method 3: Two-Phase Parallel Build ==="
 rm -rf wheels-repo sdists-repo work-dir
 
 echo "Phase 1: Discovery only (fast)"
-time fromager bootstrap -r requirements.txt -c constraints.txt --sdist-only
+time fromager -c constraints.txt bootstrap -r requirements.txt --sdist-only
 
 echo -e "\nPhase 2: Parallel build from graph"
 time fromager build-parallel work-dir/graph.json -m 4

@@ -31,7 +31,7 @@ pyparsing==3.0.9
 EOF
 
 echo "1. Building data science stack with constraints..."
-fromager bootstrap -r requirements.txt -c constraints.txt
+fromager -c constraints.txt bootstrap -r requirements.txt
 
 echo "2. Analyzing the build..."
 echo "Number of packages built:"
