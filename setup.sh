@@ -6,7 +6,13 @@ set -e
 
 echo "=== Fromager Learning Environment Setup ==="
 
-# Check Python version
+# Check if Python is installed
+if ! command -v python3 &> /dev/null; then
+    echo "Error: python3 not found"
+    exit 1
+fi
+
+# Check required Python version
 python_version=$(python3 --version 2>&1 | grep -oE '[0-9]+\.[0-9]+')
 min_version="3.11"
 
