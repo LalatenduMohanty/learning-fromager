@@ -1,6 +1,15 @@
 # How to Read the Fromager Codebase
 
-This guide helps you understand the fromager codebase structure and navigate it effectively. If you're coming from using fromager as a tool and want to contribute, start here.
+This guide helps you understand the fromager codebase structure and navigate it effectively.
+
+## Prerequisites
+
+Before diving into the code, you should have:
+
+- **Completed the [README examples](README.md)** - Understand how to use fromager
+- **Read the [Architecture Guide](ARCHITECTURE.md)** - Understand the system design and core concepts
+
+This guide focuses on **how to navigate and read the actual code** with practical examples and techniques.
 
 ## Quick Start: Your First Hour
 
@@ -1747,4 +1756,11 @@ If you're unsure how to test your changes:
 9. **Understand immutability**: `DependencyNode` and `DependencyEdge` are frozen dataclasses - they never change after creation.
 
 10. **Check the docs**: `docs/` has user documentation that explains behavior from outside, which helps understand code from inside.
+
+## What's Next?
+
+Now that you can navigate the codebase effectively, continue your journey:
+
+- **[DEBUGGING_GUIDE.md](DEBUGGING_GUIDE.md)** - Learn to troubleshoot issues and debug problems
+- **[CONTRIBUTING_GUIDE.md](CONTRIBUTING_GUIDE.md)** - Transition from code reader to contributor
 

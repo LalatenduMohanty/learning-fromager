@@ -4,12 +4,6 @@
 
 Fromager is a tool for rebuilding complete dependency trees of Python wheels from source, ensuring full reproducibility and transparency in the build process.
 
-## Related Documentation
-
-For contributors, see also:
-- [How to Read the Codebase](HOW_TO_READ_THE_CODE.md) - Guide to understanding the code structure with examples
-- [Debugging Guide](DEBUGGING_GUIDE.md) - Techniques and tools for debugging fromager issues
-
 ## Glossary
 
 Key terms used throughout fromager and this documentation:
@@ -745,6 +739,13 @@ PEP 517 defines multiple phases of dependency resolution:
 - Install: Runtime dependencies
 
 Fromager tracks these separately to build in the correct order and handle circular dependencies between build and runtime requirements.
+
+## Related Documentation
+
+For contributors who want to dive deeper:
+- [How to Read the Codebase](HOW_TO_READ_THE_CODE.md) - Guide to understanding the code structure with examples
+- [Debugging Guide](DEBUGGING_GUIDE.md) - Techniques and tools for debugging fromager issues
+- [Contributing Guide](CONTRIBUTING_GUIDE.md) - Path from user to contributor
 
 ## Updating This Document
 
