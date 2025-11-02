@@ -10,18 +10,19 @@ Key terms used throughout fromager and this documentation:
 
 **Package Distribution Formats**
 - **sdist** (Source Distribution): Archive containing Python source code, typically `.tar.gz` or `.zip` format. Must be built to be installed.
-- **wheel**: Pre-built binary distribution format (`.whl` file). Can be installed directly without compilation.
+- **[wheel](https://peps.python.org/pep-0427/)**: Pre-built binary distribution format (`.whl` file). Can be installed directly without compilation.
 - **Built Distribution**: General term for packages ready to install (wheels are the standard built distribution format).
 
 **Python Packaging Standards**
-- **PEP 517**: Defines the interface for build backends and the `pyproject.toml` structure for specifying build requirements.
-- **PEP 503**: Simple Repository API - defines the directory structure for package indexes (the `/simple/` layout).
-- **PEP 658**: Metadata files for packages - allows package metadata to be available without downloading the full package.
-- **PEP 714**: Rename of PEP 658 core metadata attribute.
+- **[PEP 517](https://peps.python.org/pep-0517/)**: Defines the interface for build backends and the `pyproject.toml` structure for specifying build requirements.
+- **[PEP 518](https://peps.python.org/pep-0518/)**: Specifies the `pyproject.toml` file format for declaring build system requirements.
+- **[PEP 503](https://peps.python.org/pep-0503/)**: Simple Repository API - defines the directory structure for package indexes (the `/simple/` layout).
+- **[PEP 658](https://peps.python.org/pep-0658/)**: Metadata files for packages - allows package metadata to be available without downloading the full package.
+- **[PEP 714](https://peps.python.org/pep-0714/)**: Rename of PEP 658 core metadata attribute.
 
 **Package Naming**
 - **Canonical name**: Normalized package name following Python packaging standards (`My-Package` → `my-package`). Lowercase with hyphens.
-- **Override name**: Module-safe version of canonical name used for override plugins (`my-package` → `my_package`). Hyphens become underscores.
+- **Override name**: Module-safe version of canonical name used for override plugins (`my-package` → `my_package`). Hyphens become underscores because Python module names cannot contain hyphens, but stevedore plugins and patch directories need valid Python identifiers.
 - **Distribution name**: The actual name as it appears in package files, may have different casing.
 
 **Dependency Types**
