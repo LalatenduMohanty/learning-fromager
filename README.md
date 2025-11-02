@@ -24,6 +24,15 @@ A great source for learning how to build Python wheels is the official Python Pa
 
 ## Getting Started
 
+### Keeping the Fromager Submodule Updated
+
+This repository includes the fromager source code as a git submodule for reference and learning. To get the latest fromager code:
+
+```bash
+# Update the submodule to the latest version
+git submodule update --remote
+
+
 ### Prerequisites and Installation
 
 Before diving into the examples, you'll need to set up your environment:
