@@ -22,13 +22,13 @@ Key terms used throughout fromager and this documentation:
 
 **Package Naming**
 - **Canonical name**: Normalized package name following Python packaging standards (`My-Package` → `my-package`). Lowercase with hyphens.
-- **Override name**: Module-safe version of canonical name used for override plugins (`my-package` → `my_package`). Hyphens become underscores because Python module names cannot contain hyphens, but stevedore plugins and patch directories need valid Python identifiers.
+- **Override name**: Module-safe version of canonical name used for override plugins (`my-package` → `my_package`). When fromager creates override plugins using stevedore, these plugins are Python modules that need to be imported. Since Python cannot import a module named `scikit-learn.py` (hyphens are invalid in identifiers), fromager converts the distribution package name to a valid module name by replacing hyphens with underscores.
 - **Distribution name**: The actual name as it appears in package files, may have different casing.
 
 **Dependency Types**
-- **Build-system dependencies**: Minimal tools needed to understand how to build a package (from `[build-system] requires` in `pyproject.toml`). Example: `setuptools`, `hatchling`.
-- **Build-backend dependencies**: Additional dependencies returned by build backend hooks (from `get_requires_for_build_wheel()` hook). Example: `cython` for packages with Cython code.
-- **Build-sdist dependencies**: Dependencies needed specifically for creating source distributions (from `get_requires_for_build_sdist()` hook).
+- **Build-system dependencies**: Minimal tools required to understand how to build a package, specified in `[build-system] requires` in `pyproject.toml`. These are installed before any build backend hooks are called. Examples: `setuptools`, `hatchling`, `flit-core`.
+- **Build-backend dependencies**: Additional dependencies discovered dynamically by calling the build backend's `get_requires_for_build_wheel()` hook. These are package-specific build requirements not known until the build system inspects the source. Examples: `cython` for packages with Cython extensions, `numpy` for packages that compile against NumPy headers.
+- **Build-sdist dependencies**: Dependencies required specifically for creating source distributions, returned by the `get_requires_for_build_sdist()` hook. These may differ from wheel build dependencies and are needed before sdist creation.
 - **Install dependencies** (Runtime dependencies): Packages needed when using the built package (from `Requires-Dist` in wheel metadata).
 - **Top-level dependencies**: Requirements specified directly by the user, not discovered through dependency resolution.
 
@@ -41,6 +41,31 @@ Key terms used throughout fromager and this documentation:
 - **Build variant**: Different build configurations for the same package (e.g., `cpu` vs `gpu` for ML packages).
 
 **Graph and Relationships**
+
+Example dependency graph for building Flask:
+```
+flask==2.3.0 (toplevel)
+├── build-system: setuptools, wheel
+├── build-backend: (none)
+├── install: werkzeug>=2.3.0, jinja2>=3.1.0, click>=8.0
+│
+werkzeug==2.3.7
+├── build-system: setuptools, wheel
+├── install: markupsafe>=2.1.1
+│
+jinja2==3.1.2
+├── build-system: setuptools, wheel
+├── install: markupsafe>=2.1.1
+│
+click==8.1.7
+├── build-system: setuptools, wheel
+├── install: (none)
+│
+markupsafe==2.1.3
+├── build-system: setuptools, wheel
+├── install: (none)
+```
+
 - **Dependency graph**: Directed graph tracking relationships between all packages in the build.
 - **Dependency node**: Represents a specific version of a package in the graph.
 - **Dependency edge**: Represents a typed dependency relationship between two packages.
@@ -55,7 +80,7 @@ Key terms used throughout fromager and this documentation:
 - **Settings**: YAML-based configuration controlling package build behavior.
 - **Patch**: File containing source code modifications applied before building.
 
-**Repository Structure**
+**Package Repositories**
 - **Package repository**: Directory structure serving packages following PEP 503 simple repository API.
 - **Package index**: Server providing package metadata and downloads (e.g., PyPI).
 - **Wheel server**: Local HTTP server providing built wheels during the build process.

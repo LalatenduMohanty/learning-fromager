@@ -63,7 +63,8 @@ fromager/src/fromager/
 3. **Use the learning materials** in this repo to provide context
 4. **Prioritize readability** - Clear, concise explanations are more important than comprehensive coverage
 5. **Avoid emojis in documentation** - Keep all documentation professional and emoji-free
-6. **Distinguish between**:
+6. **Avoid trailing whitespace** - Ensure no unwanted whitespace at the end of lines when writing new content
+7. **Distinguish between**:
    - User-facing concepts (from README.md)
    - Technical implementation (from source code)
    - Architecture patterns (from ARCHITECTURE.md)
