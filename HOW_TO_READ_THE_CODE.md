@@ -7,9 +7,9 @@ This guide helps you understand the fromager codebase structure and navigate it 
 Before diving into the code, you should have:
 
 - **Completed the [README examples](README.md)** - Understand how to use fromager
-- **Read the [Architecture Guide](ARCHITECTURE.md)** - Understand the system design and core concepts
+- **Read the [Architecture Guide](ARCHITECTURE.md)** - Understand the system design and core concepts, especially the [Core Components](ARCHITECTURE.md#core-components) section
 
-This guide focuses on **how to navigate and read the actual code** with practical examples and techniques.
+This guide focuses on **how to navigate and read the actual code** with practical examples and techniques. For hands-on contribution guidance, see the [Contributing Guide](CONTRIBUTING_GUIDE.md).
 
 ## Quick Start: Your First Hour
 
@@ -54,9 +54,11 @@ Open `src/fromager/context.py` and examine:
 
 The WorkContext is passed to almost every function - it's your window into the entire build state.
 
-## Core Classes and Their Relationships
+## The Four Core Components
 
-### The Big Picture
+Fromager's architecture centers around **four core components** that work in harmony to orchestrate the build process. Understanding these components and their interactions is key to navigating the codebase effectively.
+
+### Component Overview
 
 ```
 User Command
@@ -65,20 +67,168 @@ User Command
 Click Command (commands/*.py)
     |
     v
-WorkContext (central state)
-    |
-    +---> Bootstrapper (orchestration)
-    |         |
-    |         +---> Resolver (version selection)
-    |         +---> Sources (source acquisition)
-    |         +---> Dependencies (requirement extraction)
-    |         +---> BuildEnvironment (isolated builds)
-    |         +---> Wheels (wheel building)
-    |
-    +---> DependencyGraph (relationship tracking)
-    +---> Settings (configuration)
-    +---> Constraints (version control)
+┌─────────────────────────────────────────────────────────────┐
+│                    WorkContext                              │
+│                 (Central Coordination)                      │
+│  • Tracks all state and configuration                      │
+│  • Coordinates between other components                     │
+│  • Manages file paths, caches, and resources              │
+└─────────────────┬───────────────────────────────────────────┘
+                  │
+    ┌─────────────┼─────────────┐
+    │             │             │
+    v             v             v
+┌─────────┐  ┌─────────┐  ┌─────────────┐
+│Bootstrapper│  │Resolver │  │BuildEnvironment│
+│(Orchestration)│  │(Version │  │(Isolation)     │
+│• Dependency   │  │Selection)│  │• Virtual envs  │
+│  discovery    │  │• Constraint│  │• Dependency    │
+│• Build order  │  │  satisfaction│  │  installation  │
+│• Recursion    │  │• Provider  │  │• Command       │
+│  management   │  │  strategies│  │  execution     │
+└─────────┘  └─────────┘  └─────────────┘
 ```
+
+### 1. WorkContext - Central Coordination
+
+**File**: `src/fromager/context.py`
+
+**Purpose**: Acts as the "central nervous system" that tracks all state and coordinates activities between components.
+
+**Key Responsibilities**:
+- **State Management**: Maintains dependency graph, build progress, and configuration
+- **Resource Coordination**: Manages file paths, caches, and shared resources
+- **Build Orchestration**: Determines what needs to be built next and in what order
+- **Cross-Component Communication**: Provides shared context for all other components
+
+**Created**: Once at startup in `__main__.py:main()` (line ~233)
+
+**Key Attributes**:
+```python
+# Line ~35-88
+class WorkContext:
+    def __init__(self, ...):
+        self.settings = active_settings                     # Configuration system
+        self.constraints = constraints.Constraints()        # Version constraints
+        self.dependency_graph = dependency_graph.DependencyGraph()  # Relationship tracking
+        self.sdists_repo = pathlib.Path(sdists_repo)       # Source repository
+        self.wheels_repo = pathlib.Path(wheels_repo)       # Wheel repository
+        self.work_dir = pathlib.Path(work_dir)             # Working directory
+```
+
+**Key Methods**:
+- `setup()` (line ~169): Creates all required directories
+- `package_build_info()` (line ~160): Gets configuration for a specific package
+- `clean_build_dirs()` (line ~189): Cleanup after build
+- `pip_wheel_server_args` (property): Arguments for pip to use local server
+
+### 2. Bootstrapper - Dependency Resolution Engine
+
+**File**: `src/fromager/bootstrapper.py`
+
+**Purpose**: Handles recursive dependency discovery and build orchestration - the "brain" that figures out what to build and in what order.
+
+**Key Responsibilities**:
+- **Dependency Walking**: Recursively resolves build and install dependencies
+- **Cycle Detection**: Identifies and breaks circular dependencies
+- **Build Ordering**: Maintains topological sort of packages to build
+- **Progress Tracking**: Manages the overall bootstrap workflow
+
+**Created**: In `commands/bootstrap.py:bootstrap()` (line ~167)
+
+**Key State**:
+```python
+# Line ~44-74
+class Bootstrapper:
+    def __init__(self, ctx: context.WorkContext, ...):
+        self.ctx = ctx
+        self.why: list[tuple[RequirementType, Requirement, Version]] = []  # Dependency chain
+        self._build_stack: list[typing.Any] = []                           # Build order
+        self._seen_requirements: set[SeenKey] = set()                      # Cycle prevention
+        self._resolved_requirements: dict[str, tuple[str, Version]] = {}   # Version cache
+```
+
+**Key Methods**:
+- `bootstrap(req, req_type)` (line ~131): Main entry point for recursive building
+- `resolve_version(req, req_type)` (line ~76): Determines which version to use
+- `_download_and_unpack_source()` (line ~200): Acquires and prepares source code
+- `_handle_build_requirements()` (line ~378): Processes build dependencies recursively
+- `_handle_install_requirements()` (line ~538): Processes runtime dependencies recursively
+
+### 3. Resolver - Version Selection Intelligence
+
+**File**: `src/fromager/resolver.py`
+
+**Purpose**: Determines which specific versions to use for each package based on requirements, constraints, and availability.
+
+**Key Responsibilities**:
+- **Version Negotiation**: Selects versions that satisfy all constraints
+- **Provider Strategy**: Uses pluggable providers (PyPI, GitHub, GitLab, etc.)
+- **Constraint Satisfaction**: Handles complex version requirement resolution
+- **Caching**: Optimizes repeated version lookups
+
+**Key Functions**:
+- `resolve()` (line ~77): Main entry point for version resolution
+- `resolve_from_provider()` (line ~158): Uses resolvelib for constraint solving
+
+**Provider Classes**:
+- `PyPIProvider` (line ~471): Resolves from package indexes using PEP 503
+- `GitHubTagProvider` (line ~665): Resolves from GitHub repository tags
+- `GitLabTagProvider` (line ~735): Resolves from GitLab repository tags
+
+### 4. BuildEnvironment - Isolated Execution Space
+
+**File**: `src/fromager/build_environment.py`
+
+**Purpose**: Provides clean, reproducible build execution environments - the "sandbox" where packages are actually built.
+
+**Key Responsibilities**:
+- **Isolation**: Creates isolated Python virtual environments for each build
+- **Dependency Installation**: Installs build dependencies using `uv`
+- **Environment Management**: Sets up PATH, environment variables, and build tools
+- **Cleanup**: Manages lifecycle of temporary build environments
+
+**Key Methods**:
+```python
+class BuildEnvironment:
+    def __init__(self, ctx: context.WorkContext, parent_dir: pathlib.Path):
+        # Creates isolated venv at parent_dir/build-{python_version}
+
+    def install(self, reqs: typing.Iterable[Requirement]) -> None:
+        # Installs dependencies using uv pip install
+
+    def run(self, cmd: typing.Sequence[str], ...) -> str:
+        # Executes commands in the isolated environment
+
+    def get_venv_environ(self, ...) -> dict[str, str]:
+        # Sets up environment variables for isolation
+```
+
+### Component Interaction Flow
+
+The four components work together in a coordinated cycle:
+
+```
+1. WorkContext orchestrates the overall process
+   ↓
+2. Bootstrapper discovers what needs to be built
+   ↓
+3. Resolver determines which versions to use
+   ↓
+4. BuildEnvironment executes the actual builds
+   ↓
+5. WorkContext updates state and determines next steps
+   ↓
+   (cycle repeats for dependencies)
+```
+
+This **harmonious interaction** ensures that:
+- **State is consistent** across all build operations
+- **Dependencies are resolved** in the correct order
+- **Builds are isolated** and reproducible
+- **Progress is tracked** and recoverable
+
+## Core Classes and Their Relationships
 
 ### WorkContext: The Central State Object
 
@@ -129,10 +279,10 @@ def download_source(
 ) -> pathlib.Path:
     # Access settings
     pbi = ctx.package_build_info(req)  # Line ~49
-    
+
     # Access repositories
     source_path = ctx.sdists_downloads / filename  # Line ~186
-    
+
     return source_path
 ```
 
@@ -170,21 +320,21 @@ class Bootstrapper:
    def bootstrap(self, req: Requirement, req_type: RequirementType) -> Version:
        # Resolve version
        source_url, resolved_version = self.resolve_version(req=req, req_type=req_type)
-       
+
        # Add to graph
        self._add_to_graph(req, req_type, resolved_version, source_url)
-       
+
        # Check if already seen
        if self._mark_as_seen(...):
            return resolved_version
-       
+
        # Download and build
        sdist_root_dir = self._download_and_unpack_source(...)
-       
+
        # Recursively handle dependencies
        self._handle_build_requirements(...)
        self._handle_install_requirements(...)
-       
+
        return resolved_version
    ```
 
@@ -201,7 +351,7 @@ class Bootstrapper:
 
 4. **`_handle_build_requirements()`** (line ~378): Recursive build dependency processing
    - Gets build-system dependencies
-   - Gets build-backend dependencies  
+   - Gets build-backend dependencies
    - Gets build-sdist dependencies
    - Recursively bootstraps each one
 
@@ -260,7 +410,7 @@ bootstrap(requests)
        download_url: str = ""
        pre_built: bool = False
        constraint: Requirement | None = None
-       
+
        # Computed fields
        key: str                        # "package==version"
        parents: list[DependencyEdge]   # Who depends on this
@@ -298,7 +448,7 @@ bootstrap(requests)
 def _add_to_graph(self, req, req_type, resolved_version, source_url):
     # Get parent info
     parent_name, parent_version = self._get_parent_info()
-    
+
     # Add to graph
     self.ctx.dependency_graph.add_dependency(
         parent_name=parent_name,
@@ -430,7 +580,7 @@ resolve(req=Requirement("requests>=2.28.0"))
        cmd.extend(self._ctx.pip_wheel_server_args)  # Use local server
        cmd.extend(self._ctx.pip_constraint_args)    # Apply constraints
        cmd.extend(str(r) for r in requirements)
-       
+
        # Run in virtualenv
        self.run(cmd, ...)
    ```
@@ -448,7 +598,7 @@ resolve(req=Requirement("requests>=2.28.0"))
    ) -> str:
        # Merge venv environ with extra
        extra_environ = self.get_venv_environ(extra_environ)
-       
+
        # Run with isolation
        return external_commands.run(
            cmd,
@@ -515,7 +665,7 @@ Build Package X
        build_system_req_file = sdist_root_dir.parent / "build-system-requirements.txt"
        if build_system_req_file.exists():
            return _read_requirements_file(build_system_req_file)
-       
+
        # Get from pyproject.toml or override
        orig_deps = overrides.find_and_invoke(
            req.name,
@@ -523,7 +673,7 @@ Build Package X
            default_get_build_system_dependencies,
            ...
        )
-       
+
        # Filter by markers and cache
        deps = _filter_requirements(req, orig_deps)
        _write_requirements_file(deps, build_system_req_file)
@@ -547,10 +697,10 @@ Build Package X
        # Extract METADATA from wheel
        with zipfile.ZipFile(wheel_filename) as zf:
            metadata_content = zf.read(metadata_path)
-       
+
        # Parse with packaging.metadata
        metadata = Metadata.from_email(metadata_content)
-       
+
        # Return Requires-Dist
        return set(Requirement(r) for r in metadata.requires_dist or [])
    ```
@@ -600,7 +750,7 @@ Build Package X
        # Handle git URLs specially
        if req.url:
            return download_git_source(...)
-       
+
        # Allow overrides
        source_path = overrides.find_and_invoke(
            req.name,
@@ -625,7 +775,7 @@ Build Package X
        elif zipfile.is_zipfile(source_filename):
            with zipfile.ZipFile(source_filename) as zf:
                zf.extractall(sdist_root_dir)
-       
+
        # Find the actual source directory inside
        return _find_source_dir_in_unpacked_sdist(...)
    ```
@@ -639,11 +789,11 @@ Build Package X
    ) -> pathlib.Path:
        # Apply patches from overrides/patches/
        _apply_patches(ctx, req, source_root_dir)
-       
+
        # Vendor Rust dependencies if needed
        if needs_vendoring:
            vendor_rust.vendor(...)
-       
+
        return source_root_dir
    ```
 
@@ -671,10 +821,10 @@ Build Package X
            default_build_wheel,
            ...
        )
-       
+
        # Add extra metadata
        wheel_filename = add_extra_metadata_to_wheels(...)
-       
+
        return wheel_filename
    ```
 
@@ -683,7 +833,7 @@ Build Package X
    def default_build_wheel(...) -> pathlib.Path:
        # Prepare environment
        extra_environ = packagesettings.get_extra_environ(...)
-       
+
        # Build using python -m build
        cmd = [
            build_env.python,
@@ -692,7 +842,7 @@ Build Package X
            "--outdir", str(ctx.wheels_build),
            str(build_dir),
        ]
-       
+
        # Run with isolation
        build_env.run(
            cmd,
@@ -700,7 +850,7 @@ Build Package X
            network_isolation=ctx.network_isolation,
            ...
        )
-       
+
        # Find built wheel
        return finders.find_wheel(ctx.wheels_build, req, version)
    ```
@@ -711,19 +861,19 @@ Build Package X
        # Unzip wheel
        with zipfile.ZipFile(wheel_file) as zf:
            zf.extractall(wheel_root_dir)
-       
+
        # Analyze ELF dependencies
        elfinfos = _extra_metadata_elfdeps(...)
-       
+
        # Add fromager-build-settings
        build_settings = {...}
        with open(dist_info_dir / "fromager-build-settings", "w") as f:
            json.dump(build_settings, f)
-       
+
        # Rezip wheel
        with zipfile.ZipFile(new_wheel, "w") as zf:
            add_files_to_wheel(...)
-       
+
        return new_wheel
    ```
 
@@ -746,7 +896,7 @@ def bootstrap(
 ) -> None:
     # Parse input requirements (line ~34)
     to_build = _get_requirements_from_args(toplevel, requirements_files)
-    
+
     # Create bootstrapper (line ~167)
     bs = bootstrapper.Bootstrapper(
         ctx=wkctx,
@@ -755,10 +905,10 @@ def bootstrap(
         cache_wheel_server_url=cache_wheel_server_url,
         sdist_only=sdist_only,
     )
-    
+
     # Start server (line ~174)
     server.start_wheel_server(wkctx)
-    
+
     # Bootstrap each requirement (line ~177)
     for req in to_build:
         bs.bootstrap(
@@ -783,14 +933,14 @@ def resolve_version(
     req_str = str(req)
     if req_str in self._resolved_requirements:
         return self._resolved_requirements[req_str]
-    
+
     # Check if prebuilt (line ~90)
     pbi = self.ctx.package_build_info(req)
     if pbi.pre_built:
         source_url, resolved_version = self._resolve_prebuilt_with_history(...)
     else:
         source_url, resolved_version = self._resolve_source_with_history(...)
-    
+
     # Cache result (line ~102)
     self._resolved_requirements[req_str] = (source_url, resolved_version)
     return source_url, resolved_version
@@ -808,7 +958,7 @@ def _resolve_source_with_history(
         if nodes:
             # Reuse version from previous run
             return nodes[0].download_url, nodes[0].version
-    
+
     # Resolve fresh (line ~824)
     resolved_url, resolved_version = sources.resolve_source(
         ctx=self.ctx,
@@ -831,7 +981,7 @@ def resolve_source(
 ) -> tuple[str, Version]:
     # Get constraint (line ~116)
     constraint = ctx.constraints.get_constraint(req.name)
-    
+
     # Allow override (line ~122)
     resolver_results = overrides.find_and_invoke(
         req.name,
@@ -842,7 +992,7 @@ def resolve_source(
         sdist_server_url=sdist_server_url,
         req_type=req_type,
     )
-    
+
     url, version = resolver_results
     return str(url), version
 ```
@@ -857,10 +1007,10 @@ def default_resolve_source(
     req_type: RequirementType | None = None,
 ) -> tuple[str, Version]:
     pbi = ctx.package_build_info(req)
-    
+
     # Get resolver settings (line ~161)
     override_sdist_server_url = pbi.resolver_sdist_server_url(sdist_server_url)
-    
+
     # Call resolver (line ~163)
     url, version = resolver.resolve(
         ctx=ctx,
@@ -896,7 +1046,7 @@ def resolve(
         req=req,
         ...
     )
-    
+
     # Resolve (line ~100)
     return resolve_from_provider(provider, req)
 ```
@@ -907,10 +1057,10 @@ def resolve(
 def resolve_from_provider(provider: BaseProvider, req: Requirement):
     reporter = LogReporter(req)
     rslvr = resolvelib.Resolver(provider, reporter)  # External library
-    
+
     # This calls provider.find_matches() to get candidates
     result = rslvr.resolve([req])
-    
+
     # Extract result (line ~171)
     for candidate in result.mapping.values():
         return candidate.url, candidate.version
@@ -927,7 +1077,7 @@ def find_matches(
 ) -> typing.Iterable[Candidate]:
     # Try cache first (line ~530)
     candidates = self.get_from_cache(identifier, requirements, incompatibilities)
-    
+
     if not candidates:
         # Get from PyPI (line ~535)
         for candidate in get_project_from_pypi(
@@ -939,10 +1089,10 @@ def find_matches(
             # Validate against requirements and constraints (line ~541)
             if self.validate_candidate(identifier, requirements, incompatibilities, candidate):
                 candidates.append(candidate)
-        
+
         # Cache it (line ~545)
         self.add_to_cache(identifier, candidates)
-    
+
     # Return sorted by version descending (line ~571)
     return sorted(candidates, key=attrgetter("version", "build_tag"), reverse=True)
 ```
@@ -992,16 +1142,16 @@ def find_and_invoke(
     fn = find_override_method(distname, method)
     if not fn:
         fn = default_fn  # Use default if no override
-    
+
     # Invoke it (line ~50)
     result = invoke(fn, **kwargs)
-    
+
     # Log (line ~51)
     if fn is default_fn:
         logger.debug(f"{distname}: override method {fn.__name__} returned {result}")
     else:
         logger.info(f"{distname}: override method {fn.__name__} returned {result}")
-    
+
     return result
 ```
 
@@ -1011,17 +1161,17 @@ def find_and_invoke(
 def find_override_method(distname: str, method: str) -> typing.Callable | None:
     # Convert name (line ~122)
     distname = pkgname_to_override_module(distname)  # torch -> torch
-    
+
     # Load module via stevedore (line ~124)
     try:
         mod = _get_extensions()[distname].plugin
     except KeyError:
         return None  # No override module
-    
+
     # Check if method exists (line ~132)
     if not hasattr(mod, method):
         return None  # Module exists but not this method
-    
+
     # Return the function (line ~136)
     return getattr(mod, method)
 ```
@@ -1056,14 +1206,14 @@ def from_files(
 ) -> Settings:
     # Load global settings (line ~902)
     settings = SettingsFile.from_file(settings_file) if settings_file.exists() else SettingsFile()
-    
+
     # Load per-package settings (line ~910)
     package_settings: list[PackageSettings] = []
     if settings_dir.exists():
         for yaml_file in sorted(settings_dir.glob("*.yaml")):
             pkg_settings = PackageSettings.from_yaml(yaml_file)
             package_settings.append(pkg_settings)
-    
+
     # Create Settings object (line ~920)
     return cls(
         settings=settings,
@@ -1084,7 +1234,7 @@ def package_build_info(
         name = package.name
     else:
         name = package
-    
+
     # Delegates to settings (line ~167)
     return self.settings.package_build_info(name)
 ```
@@ -1119,7 +1269,7 @@ class PackageBuildInfo:
         self._variant = variant
         self._per_package = per_package
         self._global_cfg = global_cfg
-    
+
     # Computed properties with fallbacks
     @property
     def pre_built(self) -> bool:
@@ -1130,7 +1280,7 @@ class PackageBuildInfo:
         if self._per_package.pre_built is not None:
             return self._per_package.pre_built
         return self._global_cfg.pre_built
-    
+
     @property
     def extra_environ(self) -> dict[str, str]:
         # Merge global + package + variant
@@ -1261,7 +1411,7 @@ Utilities
    ```python
    import click
    from .. import context
-   
+
    @click.command()
    @click.pass_obj
    def mycommand(wkctx: context.WorkContext) -> None:
@@ -1376,13 +1526,13 @@ def test_custom_provider():
         constraints=Constraints(),
         req_type=None,
     )
-    
+
     # Create requirement
     req = Requirement("mypackage>=1.0")
-    
+
     # Resolve
     url, version = resolver.resolve_from_provider(provider, req)
-    
+
     # Assert
     assert isinstance(version, Version)
     assert version >= Version("1.0")
@@ -1399,11 +1549,11 @@ def test_download_source_with_override(tmp_path):
     # Create mock context
     mock_ctx = Mock()
     mock_ctx.sdists_downloads = tmp_path
-    
+
     # Mock the override system
     with patch('fromager.overrides.find_and_invoke') as mock_override:
         mock_override.return_value = tmp_path / "mypackage-1.0.tar.gz"
-        
+
         # Call function
         result = sources.download_source(
             ctx=mock_ctx,
@@ -1411,7 +1561,7 @@ def test_download_source_with_override(tmp_path):
             version=Version("1.0"),
             download_url="https://example.com/mypackage-1.0.tar.gz",
         )
-        
+
         # Verify override was called
         mock_override.assert_called_once()
         assert result == tmp_path / "mypackage-1.0.tar.gz"
@@ -1612,10 +1762,10 @@ fromager mycommand test-arg
 def test_mycommand():
     from click.testing import CliRunner
     from fromager.commands.mycommand import mycommand
-    
+
     runner = CliRunner()
     result = runner.invoke(mycommand, ['test-arg'])
-    
+
     assert result.exit_code == 0
     assert "expected output" in result.output
 

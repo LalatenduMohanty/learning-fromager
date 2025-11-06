@@ -18,15 +18,15 @@ Before diving into contributions, you should be comfortable with:
 - **Testing**: Writing unit tests and understanding test-driven development
 
 If you need to brush up on any of these, see:
-- [How to Read the Code](HOW_TO_READ_THE_CODE.md) - Understanding the codebase structure
-- [Architecture Guide](ARCHITECTURE.md) - High-level system design
+- [How to Read the Code](HOW_TO_READ_THE_CODE.md) - Understanding the codebase structure and the [four core components](HOW_TO_READ_THE_CODE.md#the-four-core-components)
+- [Architecture Guide](ARCHITECTURE.md) - High-level system design and [core components](ARCHITECTURE.md#core-components)
 - [Debugging Guide](DEBUGGING_GUIDE.md) - Troubleshooting and development tools
 
 ## Your First Contribution: A Self-Paced Learning Path
 
 This learning path is designed to be **self-paced** - take as much time as you need for each step. Some developers may complete this in a few days, others may take weeks or months. The important thing is to understand each concept thoroughly before moving to the next step.
 
-**Estimated time commitment**: 
+**Estimated time commitment**:
 - **Beginner**: 2-4 weeks (1-2 hours per day)
 - **Experienced**: 1-2 weeks (2-3 hours per day)
 - **Expert**: 3-5 days (focused learning)
@@ -99,32 +99,65 @@ Follow a simple package through the bootstrap process:
    - `_download_and_unpack_source()` - source acquisition
    - `_handle_build_requirements()` - dependency processing
 
-### Phase 2: Understanding Core Systems
+### Phase 2: Understanding the Four Core Components
 
-**Step 4: Dependency Graph System**
+Fromager's architecture centers around **four core components** that work in harmony. Understanding these components and their interactions is essential for effective contribution. Study them in this order to build a complete mental model.
 
-The dependency graph is central to fromager's operation:
+**Step 4: WorkContext - The Central Coordinator**
 
-1. **Study the data structures** in `src/fromager/dependency_graph.py`:
+The WorkContext is the "central nervous system" that coordinates all activities:
+
+1. **Study the WorkContext** in `src/fromager/context.py`:
    ```python
-   # Key classes to understand
-   class DependencyNode:    # Represents a package version
-   class DependencyEdge:    # Represents a dependency relationship
-   class DependencyGraph:   # The graph itself
+   # Key attributes to understand (line ~35-88)
+   class WorkContext:
+       def __init__(self, ...):
+           self.settings = active_settings                     # Configuration system
+           self.constraints = constraints.Constraints()        # Version constraints
+           self.dependency_graph = dependency_graph.DependencyGraph()  # Relationship tracking
+           self.sdists_repo = pathlib.Path(sdists_repo)       # Source repository
+           self.wheels_repo = pathlib.Path(wheels_repo)       # Wheel repository
    ```
 
-2. **Understand edge types**:
-   - `install`: Runtime dependencies
-   - `build-system`: PEP 517 build-system requirements
-   - `build-backend`: Additional build dependencies
-   - `toplevel`: User-specified requirements
+2. **Understand state management**:
+   - How configuration flows through the system
+   - Directory structure and file organization
+   - Dependency graph maintenance
 
-3. **Practice with the graph**:
+3. **Practice with WorkContext**:
    ```bash
-   # Bootstrap a package and examine the graph
-   fromager bootstrap requests
-   
-   # Look at the generated graph
+   # See how WorkContext is created and used
+   fromager -v canonicalize requests
+
+   # Examine the working directory structure
+   fromager bootstrap click
+   find work-dir/ -type f | head -10
+   ```
+
+**Step 5: Bootstrapper - The Orchestration Engine**
+
+The Bootstrapper handles recursive dependency discovery and build ordering:
+
+1. **Study the orchestration logic** in `src/fromager/bootstrapper.py`:
+   ```python
+   # Key methods to understand
+   def bootstrap(self, req, req_type):           # Main entry point (line ~131)
+   def resolve_version(self, req, req_type):     # Version selection (line ~76)
+   def _handle_build_requirements(self, ...):   # Build deps (line ~378)
+   def _handle_install_requirements(self, ...): # Runtime deps (line ~538)
+   ```
+
+2. **Understand the recursive flow**:
+   - How dependencies are discovered
+   - Cycle detection and prevention
+   - Build order computation
+
+3. **Practice with dependency resolution**:
+   ```bash
+   # Trace the bootstrap process
+   fromager -v bootstrap requests
+
+   # Examine the dependency graph
    python -c "
    import json
    with open('work-dir/graph.json') as f:
@@ -134,54 +167,97 @@ The dependency graph is central to fromager's operation:
    "
    ```
 
-**Step 5: Version Resolution**
+**Step 6: Resolver - The Version Selection Intelligence**
 
-Understanding how fromager selects package versions:
+The Resolver determines which specific versions to use:
 
-1. **Study the resolver** in `src/fromager/resolver.py`:
-   - `PyPIProvider`: Standard PyPI resolution
-   - `GitHubTagProvider`: GitHub release resolution
-   - `GitLabTagProvider`: GitLab release resolution
+1. **Study version resolution** in `src/fromager/resolver.py`:
+   ```python
+   # Key provider classes
+   class PyPIProvider:      # Standard PyPI resolution (line ~471)
+   class GitHubTagProvider: # GitHub release resolution (line ~665)
+   class GitLabTagProvider: # GitLab release resolution (line ~735)
+   ```
 
-2. **Understand constraints** in `src/fromager/constraints.py`:
-   - How version constraints are applied
-   - Interaction with requirements
+2. **Understand constraint satisfaction**:
+   - How requirements and constraints interact
+   - Provider strategy pattern
+   - Caching mechanisms
 
 3. **Test resolution manually**:
    ```bash
    # Use the step command to see resolution in action
    fromager step --step resolve "requests>=2.28.0"
-   
+
    # With constraints
    echo "requests<2.32.0" > constraints.txt
    fromager -c constraints.txt step --step resolve "requests>=2.28.0"
    ```
 
-**Step 6: Build System**
+**Step 7: BuildEnvironment - The Isolation System**
 
-How fromager builds packages:
+The BuildEnvironment provides clean, reproducible build execution:
 
-1. **Study build environments** in `src/fromager/build_environment.py`:
-   - Virtual environment creation
-   - Dependency installation with uv
-   - Command execution with isolation
+1. **Study build isolation** in `src/fromager/build_environment.py`:
+   ```python
+   # Key methods to understand
+   class BuildEnvironment:
+       def __init__(self, ctx, parent_dir):     # Environment creation
+       def install(self, reqs):                 # Dependency installation
+       def run(self, cmd, ...):                 # Command execution
+       def get_venv_environ(self, ...):         # Environment setup
+   ```
 
-2. **Understand wheel building** in `src/fromager/wheels.py`:
-   - PEP 517 build process
-   - Metadata extraction and enhancement
-   - ELF dependency analysis
+2. **Understand isolation mechanisms**:
+   - Virtual environment creation with `uv`
+   - Environment variable management
+   - Network isolation capabilities
 
-3. **Practice building**:
+3. **Practice with build environments**:
    ```bash
    # Build a single package step by step
    fromager step --step download click==8.1.0
    fromager step --step build-system-dependencies click==8.1.0
    fromager step --step build-wheel click==8.1.0
+
+   # Examine the build environment
+   ls -la work-dir/click-8.1.0/build-*/
+   ```
+
+**Step 8: Component Interaction Flow**
+
+Now that you understand each component, see how they work together:
+
+1. **Trace a complete flow**:
+   ```bash
+   # Enable detailed logging to see component interactions
+   fromager -v --log-file=trace.log bootstrap simple-package
+
+   # Examine the log to see:
+   # - WorkContext coordinating the process
+   # - Bootstrapper discovering dependencies
+   # - Resolver selecting versions
+   # - BuildEnvironment executing builds
+   ```
+
+2. **Understand the interaction cycle**:
+   ```
+   WorkContext (orchestrates)
+       ↓
+   Bootstrapper (discovers dependencies)
+       ↓
+   Resolver (selects versions)
+       ↓
+   BuildEnvironment (executes builds)
+       ↓
+   WorkContext (updates state, determines next steps)
+       ↓
+   (cycle repeats for dependencies)
    ```
 
 ### Phase 3: Customization and Extension Systems
 
-**Step 7: Override System**
+**Step 9: Override System**
 
 Fromager's plugin architecture for package-specific customization:
 
@@ -196,7 +272,7 @@ Fromager's plugin architecture for package-specific customization:
    def resolve_source(ctx, req, sdist_server_url, req_type):
        from packaging.version import Version
        return "https://example.com/mytest-1.0.tar.gz", Version("1.0")
-   
+
    # Create test-overrides/setup.py
    from setuptools import setup, find_packages
    setup(
@@ -208,7 +284,7 @@ Fromager's plugin architecture for package-specific customization:
            ]
        }
    )
-   
+
    # Install and test
    pip install -e test-overrides/
    fromager step --step resolve mytest
@@ -216,7 +292,7 @@ Fromager's plugin architecture for package-specific customization:
 
 3. **Study existing overrides** in the main repository's `e2e/` directory.
 
-**Step 8: Settings System**
+**Step 10: Settings System**
 
 YAML-based configuration for packages:
 
@@ -240,7 +316,7 @@ YAML-based configuration for packages:
 
 3. **Understand the settings loading process** in `WorkContext.package_build_info()`.
 
-**Step 9: Hook System**
+**Step 11: Hook System**
 
 Event-driven extensions for cross-cutting concerns:
 
@@ -255,7 +331,7 @@ Event-driven extensions for cross-cutting concerns:
    def post_build(ctx, req, dist_name, dist_version, sdist_filename, wheel_filename):
        print(f"Built {dist_name} {dist_version}")
        # Could add custom metadata, run security scans, etc.
-   
+
    # Register in setup.py
    entry_points={
        "fromager.hooks": [
@@ -266,7 +342,7 @@ Event-driven extensions for cross-cutting concerns:
 
 ### Phase 4: Making Your First Contribution
 
-**Step 10: Identify a Contribution Opportunity**
+**Step 12: Identify a Contribution Opportunity**
 
 Good first contributions include:
 
@@ -290,7 +366,7 @@ Good first contributions include:
    - Create regression tests for fixed bugs
    - Improve test documentation
 
-**Step 11: Implement Your Contribution**
+**Step 13: Implement Your Contribution**
 
 1. **Create a focused branch**:
    ```bash
@@ -323,22 +399,22 @@ Good first contributions include:
    ```bash
    # Run unit tests
    hatch run test:test tests/test_commands.py
-   
+
    # Run integration tests
    ./e2e/test_bootstrap.sh
-   
+
    # Test manually
    fromager --help
    fromager bootstrap --my-new-option mypackage
    ```
 
-**Step 12: Submit and Iterate**
+**Step 14: Submit and Iterate**
 
 1. **Prepare your pull request**:
    ```bash
    # Ensure clean commit history
    git log --oneline
-   
+
    # Push to your fork
    git push origin fix-issue-123
    ```
@@ -347,17 +423,17 @@ Good first contributions include:
    ```markdown
    ## Summary
    Brief description of what this PR does and why.
-   
+
    ## Changes
    - Added new command option `--my-new-option`
    - Updated help text and documentation
    - Added unit tests for new functionality
-   
+
    ## Testing
    - All existing tests pass
    - Added new test cases in `tests/test_commands.py`
    - Manually tested with various packages
-   
+
    ## Related Issues
    Fixes #123
    ```
@@ -379,7 +455,7 @@ Commands are the primary user interface to fromager. Here's how to add one:
    # src/fromager/commands/mycommand.py
    import click
    from .. import context
-   
+
    @click.command()
    @click.option("--my-option", help="Description of option")
    @click.argument("package_name")
@@ -405,7 +481,7 @@ Commands are the primary user interface to fromager. Here's how to add one:
    ```python
    # In src/fromager/commands/__init__.py
    from .mycommand import mycommand
-   
+
    commands = [
        # ... existing commands
        mycommand,
@@ -417,7 +493,7 @@ Commands are the primary user interface to fromager. Here's how to add one:
    # In tests/test_commands.py
    from click.testing import CliRunner
    from fromager.commands.mycommand import mycommand
-   
+
    def test_mycommand():
        runner = CliRunner()
        result = runner.invoke(mycommand, ['test-package'])
@@ -506,12 +582,12 @@ Override points allow plugins to customize specific behaviors:
    def my_function(ctx, req, ...):
        """
        Override point for customizing my_function behavior.
-       
+
        Args:
            ctx: Work context
            req: Package requirement
            ...: Other parameters
-           
+
        Returns:
            Expected return type
        """
@@ -536,7 +612,7 @@ Hooks allow multiple plugins to respond to events:
    ```python
    # At the appropriate point in the code
    from . import hooks
-   
+
    # After some operation completes
    hook_mgr = hooks._get_hooks("my_new_hook")
    for ext in hook_mgr:
@@ -557,7 +633,7 @@ Hooks allow multiple plugins to respond to events:
    def my_new_hook(ctx, req, result, ...):
        """
        Called after my_operation completes.
-       
+
        Args:
            ctx: Work context
            req: Package requirement
@@ -590,14 +666,14 @@ Fromager follows Python best practices:
    ```python
    def my_function(ctx: context.WorkContext, req: Requirement) -> pathlib.Path:
        """Brief description of what the function does.
-       
+
        Args:
            ctx: Work context containing build configuration
            req: Package requirement to process
-           
+
        Returns:
            Path to the processed result
-           
+
        Raises:
            ValueError: If req is invalid
        """
@@ -615,9 +691,9 @@ Fromager follows Python best practices:
    ```python
    import logging
    from .log import req_ctxvar_context
-   
+
    logger = logging.getLogger(__name__)
-   
+
    def my_function(ctx, req):
        with req_ctxvar_context(req):
            logger.debug(f"Processing {req.name}")
@@ -643,10 +719,10 @@ Fromager follows Python best practices:
        """Test that my_function handles normal input correctly."""
        # Arrange
        input_value = create_test_input()
-       
+
        # Act
        result = my_function(input_value)
-       
+
        # Assert
        assert result == expected_output
        assert result.some_property == expected_property
@@ -660,7 +736,7 @@ Fromager follows Python best practices:
        return context.WorkContext(
            # ... configuration
        )
-   
+
    def test_with_context(work_context):
        result = my_function(work_context, test_req)
        assert result.exists()
@@ -714,7 +790,7 @@ The dependency graph is a complex data structure that requires careful handling:
    ```python
    # This won't work - nodes are immutable
    node.version = new_version  # AttributeError
-   
+
    # Instead, create a new node
    new_node = DependencyNode(
        canonicalized_name=node.canonicalized_name,
@@ -729,7 +805,7 @@ The dependency graph is a complex data structure that requires careful handling:
    # Always check parent exists before adding child
    if parent_key not in graph.nodes:
        raise ValueError(f"Parent {parent_key} must exist")
-   
+
    graph.add_dependency(
        parent_name=parent_name,
        parent_version=parent_version,
@@ -744,7 +820,7 @@ The dependency graph is a complex data structure that requires careful handling:
    # Use the provided traversal methods
    install_deps = graph.get_install_dependencies(node_key)
    build_deps = graph.get_dependency_edges(
-       node_key, 
+       node_key,
        req_types={RequirementType.BUILD_SYSTEM}
    )
    ```
@@ -758,7 +834,7 @@ Adding support for new package sources:
    class MyCustomProvider(GenericProvider):
        def _find_tags(self, project_name: str) -> list[tuple[str, str]]:
            """Find available versions for project.
-           
+
            Returns:
                List of (tag_name, download_url) tuples
            """
@@ -786,17 +862,17 @@ Build environments are complex due to isolation requirements:
    ```python
    # Create environment
    build_env = BuildEnvironment(ctx, package_work_dir)
-   
+
    # Install dependencies
    build_env.install(build_requirements, RequirementType.BUILD_SYSTEM)
-   
+
    # Run build commands
    output = build_env.run(
        ["python", "-m", "build", "--wheel"],
        cwd=source_dir,
        extra_environ={"CUSTOM_VAR": "value"},
    )
-   
+
    # Environment is cleaned up automatically (if configured)
    ```
 
@@ -834,7 +910,7 @@ When working on fromager, you'll encounter complex issues:
    ```python
    # Add breakpoint in code
    import pdb; pdb.set_trace()
-   
+
    # Run fromager
    python -m fromager bootstrap mypackage
    ```
@@ -843,10 +919,10 @@ When working on fromager, you'll encounter complex issues:
    ```bash
    # Examine dependency graph
    jq '.' work-dir/graph.json | less
-   
+
    # Check build logs
    tail -f work-dir/logs/build-mypackage-1.0.0.log
-   
+
    # Inspect build environment
    ls -la work-dir/mypackage-1.0.0/build-*/
    ```

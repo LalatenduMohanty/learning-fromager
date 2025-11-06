@@ -8,7 +8,7 @@ Before answering any questions about fromager, you **MUST** first:
 
 1. **Read this entire learning repository** - Start with the documentation in this repo:
    - `README.md` - Complete learning guide with examples
-   - `ARCHITECTURE.md` - System design and core concepts  
+   - `ARCHITECTURE.md` - System design and core concepts
    - `HOW_TO_READ_THE_CODE.md` - Code navigation techniques
    - `DEBUGGING_GUIDE.md` - Troubleshooting approaches
    - `CONTRIBUTING_GUIDE.md` - Development workflow
@@ -63,7 +63,7 @@ fromager/src/fromager/
 3. **Use the learning materials** in this repo to provide context
 4. **Prioritize readability** - Clear, concise explanations are more important than comprehensive coverage
 5. **Avoid emojis in documentation** - Keep all documentation professional and emoji-free
-6. **Avoid trailing whitespace** - Ensure no unwanted whitespace at the end of lines when writing new content
+6. **Follow strict formatting standards** - See detailed formatting guidelines below
 7. **Distinguish between**:
    - User-facing concepts (from README.md)
    - Technical implementation (from source code)
@@ -76,10 +76,120 @@ fromager/src/fromager/
 3. **Understand the plugin system**: Check `overrides.py` and stevedore integration
 4. **Check test cases**: Use `tests/` and `e2e/` for real-world examples
 
+### Documentation Formatting Standards
+
+**CRITICAL**: Always maintain clean, professional formatting in all documentation files. Poor formatting creates maintenance burden and reduces readability.
+
+#### Whitespace Rules
+
+1. **No trailing whitespace**: Never leave spaces or tabs at the end of lines
+   ```bash
+   # BAD - line ends with spaces
+   This is a line with trailing spaces
+
+   # GOOD - line ends cleanly
+   This is a line with no trailing spaces
+   ```
+
+2. **No whitespace-only blank lines**: Empty lines must be completely empty
+   ```bash
+   # BAD - blank line contains spaces/tabs
+   Line 1
+
+   Line 3
+
+   # GOOD - blank line is truly empty
+   Line 1
+
+   Line 3
+   ```
+
+3. **Consistent indentation**: Use spaces only, no mixed tabs and spaces
+   ```bash
+   # BAD - mixing tabs and spaces
+   - Item 1
+   	  - Subitem (tab + spaces)
+
+   # GOOD - spaces only
+   - Item 1
+     - Subitem (spaces only)
+   ```
+
+#### Line Ending Standards
+
+1. **End files with newline**: All files must end with a single newline character
+2. **Use Unix line endings (LF)**: Not Windows (CRLF) or old Mac (CR)
+3. **No multiple consecutive blank lines**: Maximum of one blank line between sections
+
+#### Markdown Formatting
+
+1. **Code blocks**: Always specify language for syntax highlighting
+   ```markdown
+   # BAD - no language specified
+   ```
+   some code here
+   ```
+
+   # GOOD - language specified
+   ```python
+   def example_function():
+       return "hello"
+   ```
+   ```
+
+2. **Lists**: Use consistent bullet style and indentation
+   ```markdown
+   # BAD - inconsistent bullets and indentation
+   - Item 1
+   * Item 2
+      - Subitem with wrong indentation
+
+   # GOOD - consistent style
+   - Item 1
+   - Item 2
+     - Subitem with correct indentation
+   ```
+
+3. **Headers**: Use proper hierarchy and spacing
+   ```markdown
+   # BAD - inconsistent spacing
+   ##Header without space
+   ### Another header
+
+
+   ####Too many blank lines above
+
+   # GOOD - consistent spacing
+   ## Header with space
+   ### Another header
+
+   #### Proper spacing above
+   ```
+
+#### Quality Checks
+
+Before submitting any documentation changes:
+
+1. **Remove trailing whitespace**: Use `sed -i 's/[ \t]*$//' filename.md`
+2. **Check for mixed indentation**: Use `grep -P "^\t+ " filename.md`
+3. **Verify blank lines**: Use `grep -n "^[ \t]\+$" filename.md`
+4. **Validate markdown**: Use a markdown linter if available
+
+#### Common Formatting Mistakes to Avoid
+
+1. **Trailing spaces after bullet points**
+2. **Inconsistent code block indentation**
+3. **Mixed tab/space indentation in lists**
+4. **Missing newlines at end of files**
+5. **Whitespace-only lines in code examples**
+6. **Inconsistent header spacing**
+
+**Remember**: Clean formatting is not optional - it's a professional standard that makes documentation maintainable and readable.
+
 ### Common Pitfalls to Avoid
 
 1. **Don't confuse package names with override names**:
-   - Package: `scikit-learn` 
+   - Package: `scikit-learn`
    - Override: `scikit_learn` (hyphens → underscores)
 
 2. **Don't mix up dependency types**:
@@ -126,7 +236,7 @@ learning-fromager/           # This learning repository
 ├── setup.sh              # Environment setup
 └── fromager/             # Git submodule → actual fromager source
     ├── src/fromager/     # Main source code
-    ├── docs/            # Official documentation  
+    ├── docs/            # Official documentation
     ├── tests/           # Test suite
     └── e2e/             # End-to-end tests
 ```

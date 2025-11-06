@@ -110,6 +110,58 @@ markupsafe==2.1.3
 - **URL**: Uniform Resource Locator - web address for downloading packages or sources.
 - **VCS**: Version Control System (git, mercurial, etc.).
 
+## Core Components
+
+Fromager's architecture centers around **four core components** that work in harmony to orchestrate the build process:
+
+### 1. **WorkContext** - Central Coordination
+The `WorkContext` serves as the **central nervous system** that tracks state and coordinates all activities:
+- **State Management**: Maintains dependency graph, build progress, and configuration
+- **Resource Coordination**: Manages file paths, caches, and shared resources
+- **Build Orchestration**: Determines what needs to be built next and in what order
+- **Cross-Component Communication**: Provides shared context for all other components
+
+### 2. **Bootstrapper** - Dependency Resolution Engine
+The `Bootstrapper` handles the **recursive dependency discovery and build orchestration**:
+- **Dependency Walking**: Recursively resolves build and install dependencies
+- **Cycle Detection**: Identifies and breaks circular dependencies
+- **Build Ordering**: Maintains topological sort of packages to build
+- **Progress Tracking**: Manages the overall bootstrap workflow
+
+### 3. **Resolver** - Version Selection Intelligence
+The `Resolver` determines **which specific versions to use** for each package:
+- **Version Negotiation**: Selects versions that satisfy all constraints
+- **Provider Strategy**: Uses pluggable providers (PyPI, GitHub, GitLab, etc.)
+- **Constraint Satisfaction**: Handles complex version requirement resolution
+- **Caching**: Optimizes repeated version lookups
+
+### 4. **BuildEnvironment** - Isolated Execution Space
+The `BuildEnvironment` provides **clean, reproducible build execution**:
+- **Isolation**: Creates isolated Python virtual environments for each build
+- **Dependency Installation**: Installs build dependencies using `uv`
+- **Environment Management**: Sets up PATH, environment variables, and build tools
+- **Cleanup**: Manages lifecycle of temporary build environments
+
+### Component Interaction Flow
+
+```
+WorkContext (orchestrates)
+    ↓
+Bootstrapper (discovers dependencies)
+    ↓
+Resolver (selects versions)
+    ↓
+BuildEnvironment (executes builds)
+    ↓
+WorkContext (updates state, determines next steps)
+```
+
+This **harmonious interaction** ensures that:
+- **State is consistent** across all build operations
+- **Dependencies are resolved** in the correct order
+- **Builds are isolated** and reproducible
+- **Progress is tracked** and recoverable
+
 ## Core Design Principles
 
 ### Source-First Philosophy
@@ -553,7 +605,7 @@ src/fromager/
   version.py               # Version information (generated)
   versionmap.py            # Version mapping utilities
   threading_utils.py       # Thread synchronization helpers
-  
+
   commands/                # CLI command implementations
     __init__.py            # Command registration
     bootstrap.py           # Bootstrap command
@@ -596,12 +648,12 @@ This ensures all packages are built in correct order with their dependencies ava
 
 ### Build Order Computation
 
-Build order is a topological sort of the dependency graph:
+Build order is computed using a topological sort of the dependency graph:
 
-1. Start from nodes with no dependencies
-2. Process nodes whose dependencies are all built
-3. Handle cycles by breaking them at runtime dependency edges
-4. Build requirements must be built before packages that need them
+1. **Start with leaf nodes**: Begin with packages that have no build dependencies (e.g., `setuptools`, `wheel`)
+2. **Process ready nodes**: In each iteration, identify packages whose build dependencies have all been satisfied
+3. **Break dependency cycles**: Handle circular dependencies by breaking them at runtime dependency edges (install-time cycles are acceptable, build-time cycles must be resolved)
+4. **Respect build constraints**: Ensure all build-system, build-backend, and build-sdist dependencies are built before the packages that require them
 
 The order is preserved in `build-order.json` for reproducible production builds.
 
@@ -633,6 +685,16 @@ def build_wheel(ctx, req, sdist_root_dir, version, build_env):
 
 ### Hook Functions
 
+While override methods handle package-specific customizations, hook functions address **cross-cutting concerns** that apply to multiple packages or the entire build process. Hook functions are needed because:
+
+**1. Global Build Actions**: Some operations need to run for every package (e.g., security scanning, artifact uploading, metrics collection)
+
+**2. Multiple Plugin Coordination**: Unlike overrides where only one implementation can exist per package, hooks allow multiple plugins to participate in the same build event
+
+**3. Infrastructure Integration**: Hooks enable integration with external systems (CI/CD pipelines, artifact repositories, monitoring systems) without modifying core fromager logic
+
+**4. Audit and Compliance**: Enterprise environments often require logging, validation, or approval workflows that span all packages
+
 Cross-cutting concerns handled via hooks:
 
 ```python
@@ -643,6 +705,18 @@ def post_build(ctx, req, dist_name, dist_version, sdist_filename, wheel_filename
 ```
 
 ### Package Settings
+
+While override methods and hooks require writing Python code, package settings provide **declarative configuration** for common customizations. Package settings are needed because:
+
+**1. Non-Programmer Accessibility**: DevOps engineers and build maintainers can configure builds without writing Python code
+
+**2. Version Control Friendly**: YAML files are easy to review, diff, and manage in version control systems
+
+**3. Common Use Cases**: Many package customizations follow standard patterns (environment variables, build variants, source URLs) that don't require custom logic
+
+**4. Rapid Iteration**: Configuration changes can be made and tested quickly without code compilation or plugin deployment
+
+**5. Build Variants**: Support multiple build configurations (e.g., CPU vs GPU builds) from a single package definition
 
 YAML configuration provides declarative customization:
 
@@ -662,12 +736,18 @@ variants:
 
 ### Caching Strategy
 
-Multi-level caching reduces redundant work:
-- UV package cache for fast dependency installation
-- Local wheel cache for built packages
-- Remote wheel server for distributed builds
-- Resolver cache for version lookups
-- Dependency extraction cache
+Multi-level caching reduces redundant work using both persistent and in-memory strategies:
+
+**Persistent Disk Caches:**
+- **UV package cache** (`work_dir/uv-cache/`) - Downloaded packages and metadata for fast dependency installation
+- **Local wheel cache** (`wheels_repo/`) - Built wheel files organized by package and version
+- **Remote wheel server** - HTTP server serving built wheels for distributed builds across machines
+- **Source downloads cache** (`sdists_repo/downloads/`) - Downloaded source distributions and git repositories
+
+**In-Memory Caches:**
+- **Resolver cache** (`GenericProvider.generic_resolver_cache`) - Version lookup results to avoid repeated API calls
+- **Package build info cache** (`Settings._pbi_cache`) - Computed package settings and build configurations
+- **Dependency resolution cache** (`Bootstrapper._resolved_requirements`) - Previously resolved package versions
 
 ### Parallel Execution
 
