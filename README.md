@@ -86,6 +86,78 @@ xcode-select --install
 - **Constraints**: Version pinning to resolve conflicts
 - **Variants**: Different build configurations (e.g., cpu, gpu)
 
+## Source Code Origins
+
+Fromager can fetch source code from multiple different origins to build Python wheels. Understanding these sources helps you control where your packages come from and enables building in various environments.
+
+### **1. PyPI (Default)**
+The most common source - Python Package Index at `https://pypi.org/simple`:
+```bash
+# Fetches from PyPI automatically
+fromager bootstrap requests
+```
+
+### **2. Git Repositories**
+Build directly from version control:
+```bash
+# GitHub repository with specific tag
+fromager bootstrap "requests @ git+https://github.com/psf/requests.git@v2.31.0"
+
+# Any Git repository
+fromager bootstrap "mypackage @ git+https://gitlab.com/user/mypackage.git@main"
+```
+
+### **3. GitHub/GitLab Releases**
+Fromager can use GitHub and GitLab APIs to fetch release tarballs:
+- Supports GitHub authentication via `GITHUB_TOKEN` environment variable
+- Works with both public and private repositories
+- Fetches from release tags automatically
+
+### **4. Custom Package Indexes**
+Use private or alternative PyPI-compatible servers:
+```yaml
+# In settings/mypackage.yaml
+resolver_dist:
+  sdist_server_url: "https://my-company.com/simple/"
+```
+
+### **5. Direct URLs**
+Specify exact download URLs for packages:
+```yaml
+# In settings/mypackage.yaml
+download_source:
+  url: "https://releases.example.com/${canonicalized_name}-${version}.tar.gz"
+  destination_filename: "${dist_name}-${version}.tar.gz"
+```
+
+### **6. Local Files**
+Use local source code:
+```bash
+# Local tarball
+fromager bootstrap "mypackage @ file:///path/to/mypackage-1.0.0.tar.gz"
+
+# Local directory
+fromager bootstrap "mypackage @ file:///path/to/mypackage-source/"
+```
+
+### **7. Custom Override Plugins**
+Create custom source providers for specialized environments:
+```python
+# In your override plugin
+def resolve_source(ctx, req, sdist_server_url, req_type):
+    return "https://my-custom-source.com/package.tar.gz", Version("1.0.0")
+```
+
+### **Source Priority Order**
+Fromager checks sources in this order:
+1. **Git URL** (if specified in requirement)
+2. **Override plugins** (custom resolution)
+3. **Package settings** (custom URLs)
+4. **Custom package index** (if configured)
+5. **PyPI** (default fallback)
+
+This flexibility allows fromager to work in air-gapped environments, with private repositories, and in enterprise settings with custom package sources.
+
 ### Requirements vs Constraints
 
 Understanding the difference between `requirements.txt` and `constraints.txt` is crucial for effective dependency management:

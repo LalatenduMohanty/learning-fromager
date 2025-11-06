@@ -86,6 +86,18 @@ markupsafe==2.1.3
 - **Wheel server**: Local HTTP server providing built wheels during the build process.
 - **Simple API**: The PEP 503 `/simple/` directory layout for package indexes.
 
+**Source Code Origins**
+- **Source origin**: The location where fromager obtains source code for building packages.
+- **PyPI**: Python Package Index - the default source for most Python packages (`https://pypi.org/simple`).
+- **Git repository**: Version control system containing source code, accessible via git+ URLs.
+- **GitHub/GitLab provider**: API-based resolution using GitHub or GitLab REST APIs to fetch release tarballs.
+- **Custom package index**: Private or alternative PyPI-compatible servers (devpi, Artifactory, Nexus).
+- **Direct URL**: Explicit download URL for source distributions, configured in package settings.
+- **Local file system**: Source code from local files or directories using file:// URLs.
+- **Override provider**: Custom source resolution logic implemented via plugin system.
+- **Source resolution**: Process of determining which source origin to use and obtaining the download URL.
+- **Source priority**: Order in which fromager checks different source origins (Git URL → Override → Settings → Custom index → PyPI).
+
 **Version Control**
 - **Constraint**: Version limitation applied to packages (e.g., `package<2.0`).
 - **Requirement**: Package dependency specification with optional version constraints (e.g., `package>=1.0,<2.0`).
@@ -442,6 +454,12 @@ Rust dependency vendoring for network-isolated builds:
 - Shrinks vendor bundle by removing unused platform-specific files
 - Configures cargo to use vendored sources
 - Enables fully offline Rust builds
+
+## Source Code Acquisition
+
+Fromager can fetch source code from multiple origins to support different deployment environments. The primary components handling source acquisition are `sources.py` (core logic), `resolver.py` (version resolution), `packagesettings.py` (configuration), and `overrides.py` (plugins).
+
+Source resolution follows a priority order: Git URLs → Override plugins → Package settings → Custom package indexes → PyPI (default). This flexible system enables fromager to work in enterprise environments, air-gapped deployments, and development workflows while maintaining security and reproducibility.
 
 ## Command Architecture
 
