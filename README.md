@@ -4,7 +4,7 @@
 
 Fromager is a tool for rebuilding Python wheel dependency trees from source, ensuring all binaries, dependencies, and build tools are built in a known environment.
 
-**Official Documentation**: [https://fromager.readthedocs.io/en/latest/](https://fromager.readthedocs.io/en/latest/)  
+**Official Documentation**: [https://fromager.readthedocs.io/en/latest/](https://fromager.readthedocs.io/en/latest/)
 **Source Code**: [https://github.com/python-wheel-build/fromager](https://github.com/python-wheel-build/fromager)
 
 It ensures that:
@@ -407,11 +407,11 @@ index 1234567..0000000
 @@ -1,7 +0,0 @@
 - [metadata]
 - version = attr: pytest_asyncio.__version__
-- 
+-
 - [egg_info]
-- tag_build = 
+- tag_build =
 - tag_date = 0
-- 
+-
 EOF
 
 # Now it will build successfully with the patch applied
@@ -609,7 +609,8 @@ fromager bootstrap -r requirements.txt
 
 Once you're comfortable with fromager basics, continue your learning journey:
 
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Understand the system design and core concepts
+- **[GLOSSARY.md](GLOSSARY.md)** - Reference for all fromager terminology and concepts
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Understand the system design and core components
 - **[HOW_TO_READ_THE_CODE.md](HOW_TO_READ_THE_CODE.md)** - Navigate the codebase effectively
 - **[DEBUGGING_GUIDE.md](DEBUGGING_GUIDE.md)** - Troubleshoot issues and debug problems
 - **[CONTRIBUTING_GUIDE.md](CONTRIBUTING_GUIDE.md)** - Transition from user to contributor

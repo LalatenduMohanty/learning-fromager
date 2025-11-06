@@ -227,6 +227,7 @@ When asked about a fromager feature:
 ```
 learning-fromager/           # This learning repository
 ├── README.md               # Main learning guide
+├── GLOSSARY.md             # Terminology reference
 ├── ARCHITECTURE.md         # System design
 ├── HOW_TO_READ_THE_CODE.md # Code navigation
 ├── DEBUGGING_GUIDE.md      # Troubleshooting
@@ -244,6 +245,7 @@ learning-fromager/           # This learning repository
 ## Getting Started Checklist for AI Agents
 
 - [ ] Read README.md completely
+- [ ] Review GLOSSARY.md for key terminology
 - [ ] Understand ARCHITECTURE.md concepts
 - [ ] Browse HOW_TO_READ_THE_CODE.md techniques
 - [ ] Explore fromager/src/fromager/ source structure
