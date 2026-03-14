@@ -11,20 +11,18 @@ Before diving into the code, you should have:
 
 This guide focuses on **how to navigate and read the actual code** with practical examples and techniques. For hands-on contribution guidance, see the [Contributing Guide](CONTRIBUTING_GUIDE.md).
 
-> **Note**: Line numbers referenced throughout this guide are approximate and may shift as the code evolves. Use them as a starting point, then search nearby for the referenced class or function.
-
 ## Quick Start: Your First Hour
 
 ### 1. Start with the Bootstrap Flow (30 minutes)
 
 Open `src/fromager/bootstrapper.py` and read these methods in order:
 
-1. `Bootstrapper.__init__()` (line ~84): See what state the bootstrapper maintains - note the `self._resolver` (a `RequirementResolver` instance) that handles version resolution
-2. `Bootstrapper.bootstrap()` (line ~241): The main entry point - trace through this carefully
+1. `Bootstrapper.__init__()`: See what state the bootstrapper maintains - note the `self._resolver` (a `RequirementResolver` instance) that handles version resolution
+2. `Bootstrapper.bootstrap()`: The main entry point - trace through this carefully
 3. `RequirementResolver.resolve()` in `requirement_resolver.py`: Understand how versions are chosen (extracted from Bootstrapper) - it coordinates graph-based resolution, then falls back to PyPI
-4. `Bootstrapper._download_source()` (line ~728): See source acquisition
-5. `Bootstrapper._build_from_source()` (line ~798): See how source is built
-6. `Bootstrapper._handle_build_requirements()` (line ~608): Understand recursive dependency handling
+4. `Bootstrapper._download_source()`: See source acquisition
+5. `Bootstrapper._build_from_source()`: See how source is built
+6. `Bootstrapper._handle_build_requirements()`: Understand recursive dependency handling
 
 **Exercise**: Pick a simple package you know (like `click`) and trace mentally how it would flow through these methods.
 
@@ -33,27 +31,26 @@ Open `src/fromager/bootstrapper.py` and read these methods in order:
 Open `src/fromager/commands/canonicalize.py` - the simplest command:
 
 ```python
-# Line ~12
 @click.command()
-@click.argument("name", nargs=-1)
-@click.pass_obj
-def canonicalize(wkctx: context.WorkContext, name: tuple[str, ...]) -> None:
-    for n in name:
-        print(canonicalize_name(n))
+@click.argument("dist_name", nargs=-1)
+def canonicalize(dist_name: list[str]) -> None:
+    """convert a package name to its canonical form for use in override paths"""
+    for name in dist_name:
+        print(overrides.pkgname_to_override_module(name))
 ```
 
 Notice:
-- `@click.pass_obj` passes the WorkContext
+- This command is so simple it doesn't even need a `WorkContext`
 - Commands are just Click commands with entry points
-- Simple commands don't need complex state management
+- More complex commands use `@click.pass_obj` to receive the `WorkContext` (see `bootstrap` or `build`)
 
 ### 3. Understand State Management (15 minutes)
 
 Open `src/fromager/context.py` and examine:
 
-1. `WorkContext.__init__()` (line ~35): All the state that flows through the system
-2. `WorkContext.setup()` (line ~169): How directories are initialized
-3. `WorkContext.package_build_info()` (line ~160): How per-package settings are accessed
+1. `WorkContext.__init__()`: All the state that flows through the system
+2. `WorkContext.setup()`: How directories are initialized
+3. `WorkContext.package_build_info()`: How per-package settings are accessed
 
 The WorkContext is passed to almost every function - it's your window into the entire build state.
 
@@ -105,11 +102,10 @@ Click Command (commands/*.py)
 - **Build Orchestration**: Determines what needs to be built next and in what order
 - **Cross-Component Communication**: Provides shared context for all other components
 
-**Created**: Once at startup in `__main__.py:main()` (line ~233)
+**Created**: Once at startup in `__main__.py:main()`
 
 **Key Attributes**:
 ```python
-# Line ~35-88
 class WorkContext:
     def __init__(self, ...):
         self.settings = active_settings                     # Configuration system
@@ -121,9 +117,9 @@ class WorkContext:
 ```
 
 **Key Methods**:
-- `setup()` (line ~169): Creates all required directories
-- `package_build_info()` (line ~160): Gets configuration for a specific package
-- `clean_build_dirs()` (line ~189): Cleanup after build
+- `setup()`: Creates all required directories
+- `package_build_info()`: Gets configuration for a specific package
+- `clean_build_dirs()`: Cleanup after build
 - `pip_wheel_server_args` (property): Arguments for pip to use local server
 
 ### 2. Bootstrapper - Dependency Resolution Engine
@@ -139,11 +135,10 @@ class WorkContext:
 - **Progress Tracking**: Manages the overall bootstrap workflow
 - **Test Mode**: Optional `test_mode` parameter enables dry-run reporting via `finalize()`
 
-**Created**: In `commands/bootstrap.py:bootstrap()` (line ~167)
+**Created**: In `commands/bootstrap.py:bootstrap()`
 
 **Key State**:
 ```python
-# Line ~84-120
 class Bootstrapper:
     def __init__(self, ctx: context.WorkContext, ..., test_mode: bool = False):
         self.ctx = ctx
@@ -154,17 +149,39 @@ class Bootstrapper:
 ```
 
 **Key Methods**:
-- `bootstrap(req, req_type)` (line ~241): Main entry point for recursive building
+- `bootstrap(req, req_type)`: Main entry point for recursive building
 - `resolve_and_add_top_level()`: Pre-resolution phase for top-level requirements
-- `_bootstrap_impl()` (line ~304): Core implementation method called by `bootstrap()`
-- `_download_source()` (line ~728): Acquires source code
-- `_build_from_source()` (line ~798): Builds source into sdist/wheel
-- `_handle_build_requirements()` (line ~608): Processes build dependencies recursively
+- `_bootstrap_impl()`: Core implementation method called by `bootstrap()`
+- `_download_source()`: Acquires source code
+- `_build_from_source()`: Builds source into sdist/wheel
+- `_handle_build_requirements()`: Processes build dependencies recursively
 - `finalize()`: Test mode reporting (when `test_mode=True`)
 
 **Related Data Structures**: `SourceBuildResult` (dataclass) and `FailureRecord` (TypedDict) support build result tracking and test mode failure reporting.
 
-### 3. Resolver - Version Selection Intelligence
+### 3. RequirementResolver - Resolution Logic
+
+**File**: `src/fromager/requirement_resolver.py`
+
+**Purpose**: Extracted from the Bootstrapper for separation of concerns, this component coordinates resolution strategies -- trying graph-based resolution first, then falling back to PyPI.
+
+**Key Responsibilities**:
+- **Resolution Orchestration**: Coordinates resolution strategies (graph-based first, then PyPI fallback)
+- **Session-Level Cache**: Maintains a `_resolved_requirements` cache to avoid redundant lookups
+- **Pre-built Wheel Handling**: Determines whether a package uses a pre-built wheel or needs source building
+- **Source Type Classification**: Classifies requirements as `PREBUILT`, `SDIST`, `OVERRIDE`, or `GIT` via the `SourceType` enum (from `requirements_file.py`)
+
+**Created**: In `Bootstrapper.__init__()`
+
+**Key Methods**:
+- `resolve()`: Main entry point -- checks cache, then delegates to `_resolve()`
+- `_resolve()`: Internal dispatcher -- tries graph-based resolution, then version source fallback
+- `_resolve_from_graph()`: Checks the previous dependency graph for a cached version
+- `_resolve_from_version_source()`: Falls through to standard resolution via `sources.resolve_source()`
+- `get_cached_resolution()`: Retrieves a previously resolved version from session cache
+- `cache_resolution()`: Stores a resolved version in the session cache
+
+### 4. Resolver - Version Selection Intelligence
 
 **File**: `src/fromager/resolver.py`
 
@@ -177,15 +194,15 @@ class Bootstrapper:
 - **Caching**: Optimizes repeated version lookups
 
 **Key Functions**:
-- `resolve()` (line ~77): Main entry point for version resolution
-- `resolve_from_provider()` (line ~158): Uses resolvelib for constraint solving
+- `resolve()`: Main entry point for version resolution
+- `resolve_from_provider()`: Uses resolvelib for constraint solving
 
 **Provider Classes**:
-- `PyPIProvider` (line ~589): Resolves from package indexes using PEP 503
-- `GitHubTagProvider` (line ~785): Resolves from GitHub repository tags
-- `GitLabTagProvider` (line ~867): Resolves from GitLab repository tags
+- `PyPIProvider`: Resolves from package indexes using PEP 503
+- `GitHubTagProvider`: Resolves from GitHub repository tags
+- `GitLabTagProvider`: Resolves from GitLab repository tags
 
-### 4. BuildEnvironment - Isolated Execution Space
+### 5. BuildEnvironment - Isolated Execution Space
 
 **File**: `src/fromager/build_environment.py`
 
@@ -223,11 +240,13 @@ The five components work together in a coordinated cycle:
 2. Bootstrapper discovers what needs to be built
    ↓
 3. RequirementResolver coordinates version resolution
-   (graph-based first, then PyPI fallback via Resolver)
+   (graph-based first, then PyPI fallback)
    ↓
-4. BuildEnvironment executes the actual builds
+4. Resolver selects the best version from providers (PyPI, GitHub, GitLab)
    ↓
-5. WorkContext updates state and determines next steps
+5. BuildEnvironment executes the actual builds
+   ↓
+6. WorkContext updates state and determines next steps
    ↓
    (cycle repeats for dependencies)
 ```
@@ -246,11 +265,10 @@ This **harmonious interaction** ensures that:
 
 **Purpose**: Carries all state through the build process - configuration, paths, graphs, caches.
 
-**Created**: Once at startup in `__main__.py:main()` (line ~233)
+**Created**: Once at startup in `__main__.py:main()`
 
 **Key Attributes**:
 ```python
-# Line ~35-88
 class WorkContext:
     def __init__(
         self,
@@ -262,24 +280,24 @@ class WorkContext:
         work_dir: pathlib.Path,                             # Working files
         # ... more parameters
     ):
-        self.settings = active_settings                     # Line ~58
-        self.constraints = constraints.Constraints()        # Line ~60
-        self.sdists_repo = pathlib.Path(sdists_repo)       # Line ~66
-        self.wheels_repo = pathlib.Path(wheels_repo)       # Line ~69
-        self.dependency_graph = dependency_graph.DependencyGraph()  # Line ~88
+        self.settings = active_settings
+        self.constraints = constraints.Constraints()
+        self.sdists_repo = pathlib.Path(sdists_repo)
+        self.wheels_repo = pathlib.Path(wheels_repo)
+        self.dependency_graph = dependency_graph.DependencyGraph()
 ```
 
 **Key Methods**:
-- `setup()` (line ~169): Creates all required directories
-- `package_build_info()` (line ~160): Gets configuration for a specific package
-- `clean_build_dirs()` (line ~189): Cleanup after build
-- `pip_wheel_server_args` (property, line ~113): Arguments for pip to use local server
+- `setup()`: Creates all required directories
+- `package_build_info()`: Gets configuration for a specific package
+- `clean_build_dirs()`: Cleanup after build
+- `pip_wheel_server_args` (property): Arguments for pip to use local server
 
 **Used By**: Every major operation - passed as first parameter conventionally named `ctx`
 
 **Example Usage**:
 ```python
-# From sources.py, line ~61
+# From sources.py
 def download_source(
     *,
     ctx: context.WorkContext,  # Always passed
@@ -287,13 +305,11 @@ def download_source(
     version: Version,
     download_url: str,
 ) -> pathlib.Path:
-    # Access settings
-    pbi = ctx.package_build_info(req)  # Line ~49
-
-    # Access repositories
-    source_path = ctx.sdists_downloads / filename  # Line ~186
-
-    return source_path
+    # The ctx parameter provides access to all shared state:
+    #   ctx.package_build_info(req)  -- per-package settings
+    #   ctx.sdists_downloads         -- download directory
+    #   ctx.work_dir                 -- working directory
+    ...
 ```
 
 ### Bootstrapper: The Orchestrator
@@ -302,11 +318,10 @@ def download_source(
 
 **Purpose**: Coordinates the complete recursive build process from requirements to wheels. Version resolution has been extracted into `RequirementResolver` (see below).
 
-**Created**: In `commands/bootstrap.py:bootstrap()` (line ~167)
+**Created**: In `commands/bootstrap.py:bootstrap()`
 
 **Key State**:
 ```python
-# Line ~84-120
 class Bootstrapper:
     def __init__(
         self,
@@ -319,14 +334,14 @@ class Bootstrapper:
     ):
         self.ctx = ctx
         self._resolver = RequirementResolver(...)                          # Delegates resolution
-        self.why: list[tuple[RequirementType, Requirement, Version]] = []  # Line ~57
-        self._build_stack: list[typing.Any] = []                           # Line ~61
-        self._seen_requirements: set[SeenKey] = set()                      # Line ~69
+        self.why: list[tuple[RequirementType, Requirement, Version]] = []
+        self._build_stack: list[typing.Any] = []
+        self._seen_requirements: set[SeenKey] = set()
 ```
 
 **Key Methods**:
 
-1. **`bootstrap(req, req_type)`** (line ~241): Main entry point
+1. **`bootstrap(req, req_type)`**: Main entry point
    ```python
    def bootstrap(self, req: Requirement, req_type: RequirementType) -> None:
        # Resolve version (delegated to RequirementResolver)
@@ -345,24 +360,24 @@ class Bootstrapper:
 
 2. **`resolve_and_add_top_level()`**: Pre-resolution phase for top-level requirements before the main bootstrap loop.
 
-3. **`_bootstrap_impl()`** (line ~304): Core implementation method
+3. **`_bootstrap_impl()`**: Core implementation method
    - Called by `bootstrap()` after resolution and cycle-checking
    - Downloads source, handles build and install dependencies, builds sdist/wheel
    - Contains the main build orchestration logic
 
 4. **`finalize()`**: When `test_mode=True`, produces a report of test mode results and failures.
 
-5. **`_download_source()`** (line ~728): Source acquisition
+5. **`_download_source()`**: Source acquisition
    - Resolves source location
    - Downloads or clones source code
    - Returns path to downloaded source
 
-6. **`_build_from_source()`** (line ~798): Source building
+6. **`_build_from_source()`**: Source building
    - Unpacks and applies patches
    - Builds sdist and wheel
    - Returns build result
 
-7. **`_handle_build_requirements()`** (line ~608): Recursive build dependency processing
+7. **`_handle_build_requirements()`**: Recursive build dependency processing
    - Gets build-system dependencies
    - Gets build-backend dependencies
    - Gets build-sdist dependencies
@@ -394,7 +409,7 @@ bootstrap(requests)
   |     |     +-> build sdist and wheel
   |     |
   |     +-> handle install dependencies (inline in _bootstrap_impl)
-  |           +-> self._get_install_dependencies() (line ~391)
+  |           +-> self._get_install_dependencies()
         +-> bootstrap(urllib3) [recursive!]
         +-> bootstrap(charset-normalizer) [recursive!]
         +-> ...
@@ -406,11 +421,11 @@ bootstrap(requests)
 
 **Purpose**: Maintains a directed graph of package dependencies with typed edges.
 
-**Created**: In `WorkContext.__init__()` (line ~88 of context.py)
+**Created**: In `WorkContext.__init__()`
 
 **Key Components**:
 
-1. **`DependencyNode`** (line ~43): Represents a package version
+1. **`DependencyNode`**: Represents a package version
    ```python
    @dataclasses.dataclass(frozen=True, order=True, slots=True)
    class DependencyNode:
@@ -426,7 +441,7 @@ bootstrap(requests)
        children: list[DependencyEdge]  # What this depends on
    ```
 
-2. **`DependencyEdge`** (line ~185): Represents a dependency relationship
+2. **`DependencyEdge`**: Represents a dependency relationship
    ```python
    @dataclasses.dataclass(frozen=True, order=True, slots=True)
    class DependencyEdge:
@@ -435,7 +450,7 @@ bootstrap(requests)
        req_type: RequirementType   # install, build-system, build-backend, etc.
    ```
 
-3. **`DependencyGraph`** (line ~202): The graph itself
+3. **`DependencyGraph`**: The graph itself
    ```python
    class DependencyGraph:
        def __init__(self):
@@ -445,15 +460,15 @@ bootstrap(requests)
 
 **Key Methods**:
 
-- `add_dependency()` (line ~234): Add a package and its relationship to parent
-- `get_install_dependencies()` (line ~283): Get all runtime dependencies
-- `get_dependency_edges()` (line ~270): Traverse with filtering
-- `serialize()` (line ~209): Save to JSON
-- `from_file()` (line ~143): Load from JSON
+- `add_dependency()`: Add a package and its relationship to parent
+- `get_install_dependencies()`: Get all runtime dependencies
+- `get_dependency_edges()`: Traverse with filtering
+- `serialize()`: Save to JSON
+- `from_file()`: Load from JSON
 
 **Example Usage**:
 ```python
-# From bootstrapper.py, line ~145
+# From bootstrapper.py
 def _add_to_graph(self, req, req_type, resolved_version, source_url):
     # Get parent info
     parent_name, parent_version = self._get_parent_info()
@@ -491,7 +506,7 @@ ROOT
 
 **Key Functions**:
 
-1. **`resolve()`** (line ~77): Main entry point
+1. **`resolve()`**: Main entry point
    ```python
    def resolve(
        *,
@@ -513,7 +528,7 @@ ROOT
        return resolve_from_provider(provider, req)
    ```
 
-2. **`resolve_from_provider()`** (line ~158): Uses resolvelib
+2. **`resolve_from_provider()`**: Uses resolvelib
    ```python
    def resolve_from_provider(provider: BaseProvider, req: Requirement):
        reporter = LogReporter(req)
@@ -524,19 +539,19 @@ ROOT
 
 **Provider Classes**:
 
-1. **`PyPIProvider`** (line ~589): Resolves from package indexes
+1. **`PyPIProvider`**: Resolves from package indexes
    - Fetches package index HTML (PEP 503)
    - Parses available versions
    - Filters by Python version, platform, yanked status
    - Respects constraints
    - Caches results
 
-2. **`GitHubTagProvider`** (line ~785): Resolves from GitHub tags
+2. **`GitHubTagProvider`**: Resolves from GitHub tags
    - Fetches tags via GitHub API
    - Matches version patterns
    - Returns tarball URLs
 
-3. **`GitLabTagProvider`** (line ~867): Resolves from GitLab tags
+3. **`GitLabTagProvider`**: Resolves from GitLab tags
    - Similar to GitHub but uses GitLab API
 
 **Example Flow**:
@@ -569,32 +584,31 @@ resolve(req=Requirement("requests>=2.28.0"))
 
 **Key Methods**:
 
-1. **`__init__()`** (line ~79): Creates virtualenv
+1. **`__init__()`**: Creates virtualenv
    ```python
    class BuildEnvironment:
        def __init__(self, ctx: context.WorkContext, parent_dir: pathlib.Path):
            self.path = parent_dir / f"build-{platform.python_version()}"
-           self._createenv()  # Line ~86
+           self._createenv()
    ```
 
-2. **`install()`** (line ~196): Install dependencies using uv
+2. **`install()`**: Install dependencies using uv
    ```python
    def install(
        self,
-       requirements: typing.Iterable[Requirement],
-       req_type: RequirementType,
+       reqs: typing.Iterable[Requirement],
    ) -> None:
        # Build uv pip install command
        cmd = ["uv", "pip", "install"]
-       cmd.extend(self._ctx.pip_wheel_server_args)  # Use local server
        cmd.extend(self._ctx.pip_constraint_args)    # Apply constraints
-       cmd.extend(str(r) for r in requirements)
+       cmd.extend(self._ctx.pip_wheel_server_args)  # Use local server
+       cmd.extend(str(req) for req in reqs)
 
        # Run in virtualenv
        self.run(cmd, ...)
    ```
 
-3. **`run()`** (line ~136): Execute command in environment
+3. **`run()`**: Execute command in environment
    ```python
    def run(
        self,
@@ -618,7 +632,7 @@ resolve(req=Requirement("requests>=2.28.0"))
        )
    ```
 
-4. **`get_venv_environ()`** (line ~93): Prepare environment
+4. **`get_venv_environ()`**: Prepare environment
    ```python
    def get_venv_environ(self, template_env: dict | None) -> dict[str, str]:
        venv_environ = {
@@ -662,7 +676,7 @@ Build Package X
 
 **Key Functions**:
 
-1. **`get_build_system_dependencies()`** (line ~40): PEP 517 build-system requirements
+1. **`get_build_system_dependencies()`**: PEP 517 build-system requirements
    ```python
    def get_build_system_dependencies(
        *,
@@ -689,15 +703,15 @@ Build Package X
        return deps
    ```
 
-2. **`get_build_backend_dependencies()`** (line ~106): From PEP 517 hooks
+2. **`get_build_backend_dependencies()`**: From PEP 517 hooks
    - Calls `get_requires_for_build_wheel()` hook
    - Caches to `build-backend-requirements.txt`
 
-3. **`get_build_sdist_dependencies()`** (line ~151): For building sdist
+3. **`get_build_sdist_dependencies()`**: For building sdist
    - Calls `get_requires_for_build_sdist()` hook
    - Caches to `build-sdist-requirements.txt`
 
-4. **`get_install_dependencies_of_wheel()`** (line ~319): Runtime deps from wheel
+4. **`get_install_dependencies_of_wheel()`**: Runtime deps from wheel
    ```python
    def get_install_dependencies_of_wheel(
        req: Requirement,
@@ -727,7 +741,7 @@ Build Package X
 
 **Key Functions**:
 
-1. **`resolve_source()`** (line ~106): Find source location
+1. **`resolve_source()`**: Find source location
    ```python
    def resolve_source(
        *,
@@ -747,7 +761,7 @@ Build Package X
        return str(url), version
    ```
 
-2. **`download_source()`** (line ~60): Download the source
+2. **`download_source()`**: Download the source
    ```python
    def download_source(
        *,
@@ -770,7 +784,7 @@ Build Package X
        return source_path
    ```
 
-3. **`unpack_source()`** (line ~253): Extract archive
+3. **`unpack_source()`**: Extract archive
    ```python
    def unpack_source(
        req: Requirement,
@@ -789,7 +803,7 @@ Build Package X
        return _find_source_dir_in_unpacked_sdist(...)
    ```
 
-4. **`prepare_source()`** (line ~389): Apply patches and prepare
+4. **`prepare_source()`**: Apply patches and prepare
    ```python
    def prepare_source(
        ctx: context.WorkContext,
@@ -814,7 +828,7 @@ Build Package X
 
 **Key Functions** (in addition to `get_wheel_server_urls()` and `resolve_prebuilt_wheel()` for pre-built wheel support):
 
-1. **`build_wheel()`** (line ~280): Main wheel building
+1. **`build_wheel()`**: Main wheel building
    ```python
    def build_wheel(
        ctx: context.WorkContext,
@@ -837,7 +851,7 @@ Build Package X
        return wheel_filename
    ```
 
-2. **`default_build_wheel()`** (line ~428): Standard PEP 517 build
+2. **`default_build_wheel()`**: Standard PEP 517 build
    ```python
    def default_build_wheel(...) -> pathlib.Path:
        # Prepare environment
@@ -864,7 +878,7 @@ Build Package X
        return finders.find_wheel(ctx.wheels_build, req, version)
    ```
 
-3. **`add_extra_metadata_to_wheels()`** (line ~148): Add fromager metadata
+3. **`add_extra_metadata_to_wheels()`**: Add fromager metadata
    ```python
    def add_extra_metadata_to_wheels(...) -> pathlib.Path:
        # Unzip wheel
@@ -886,11 +900,11 @@ Build Package X
        return new_wheel
    ```
 
-## Real Code Examples with Line Numbers
+## Real Code Examples
 
 ### Example 1: How a Command Executes (bootstrap)
 
-**Entry Point**: `src/fromager/commands/bootstrap.py` line ~100
+**Entry Point**: `src/fromager/commands/bootstrap.py`
 
 ```python
 @click.command()
@@ -903,10 +917,10 @@ def bootstrap(
     toplevel: typing.Iterable[str],
     # ... many more options
 ) -> None:
-    # Parse input requirements (line ~34)
+    # Parse input requirements
     to_build = _get_requirements_from_args(toplevel, requirements_files)
 
-    # Create bootstrapper (line ~167)
+    # Create bootstrapper
     bs = bootstrapper.Bootstrapper(
         ctx=wkctx,
         progressbar=pbar,
@@ -916,10 +930,10 @@ def bootstrap(
         test_mode=test_mode,  # Optional: enables dry-run reporting
     )
 
-    # Start server (line ~174)
+    # Start server
     server.start_wheel_server(wkctx)
 
-    # Bootstrap each requirement (line ~177)
+    # Bootstrap each requirement
     for req in to_build:
         bs.bootstrap(
             req,
@@ -927,7 +941,7 @@ def bootstrap(
         )
 ```
 
-**What Happens Next**: Flows into `Bootstrapper.bootstrap()` at line ~241 of `bootstrapper.py`
+**What Happens Next**: Flows into `Bootstrapper.bootstrap()` in `bootstrapper.py`
 
 ### Example 2: Version Resolution with Constraints
 
@@ -953,7 +967,7 @@ class RequirementResolver:
 
 The `_resolve_from_graph()` method checks the previous dependency graph for a cached version. The `_resolve_from_version_source()` method falls through to the standard resolution path.
 
-**Flows to**: `src/fromager/sources.py` line ~106 `resolve_source()`
+**Flows to**: `src/fromager/sources.py` `resolve_source()`
 
 ```python
 def resolve_source(
@@ -963,10 +977,10 @@ def resolve_source(
     sdist_server_url: str,
     req_type: RequirementType | None = None,
 ) -> tuple[str, Version]:
-    # Get constraint (line ~116)
+    # Get constraint
     constraint = ctx.constraints.get_constraint(req.name)
 
-    # Allow override (line ~122)
+    # Allow override
     resolver_results = overrides.find_and_invoke(
         req.name,
         "resolve_source",
@@ -981,7 +995,7 @@ def resolve_source(
     return str(url), version
 ```
 
-**Flows to**: `src/fromager/sources.py` line ~152 `default_resolve_source()`
+**Flows to**: `src/fromager/sources.py` `default_resolve_source()`
 
 ```python
 def default_resolve_source(
@@ -992,10 +1006,10 @@ def default_resolve_source(
 ) -> tuple[str, Version]:
     pbi = ctx.package_build_info(req)
 
-    # Get resolver settings (line ~161)
+    # Get resolver settings
     override_sdist_server_url = pbi.resolver_sdist_server_url(sdist_server_url)
 
-    # Call resolver (line ~163)
+    # Call resolver
     url, version = resolver.resolve(
         ctx=ctx,
         req=req,
@@ -1008,7 +1022,7 @@ def default_resolve_source(
     return url, version
 ```
 
-**Flows to**: `src/fromager/resolver.py` line ~77 `resolve()`
+**Flows to**: `src/fromager/resolver.py` `resolve()`
 
 ```python
 def resolve(
@@ -1021,7 +1035,7 @@ def resolve(
     req_type: RequirementType | None = None,
     ignore_platform: bool = False,
 ) -> tuple[str, Version]:
-    # Get provider (line ~88)
+    # Get provider
     provider = overrides.find_and_invoke(
         req.name,
         "get_resolver_provider",
@@ -1031,11 +1045,11 @@ def resolve(
         ...
     )
 
-    # Resolve (line ~100)
+    # Resolve
     return resolve_from_provider(provider, req)
 ```
 
-**Flows to**: `src/fromager/resolver.py` line ~158 `resolve_from_provider()`
+**Flows to**: `src/fromager/resolver.py` `resolve_from_provider()`
 
 ```python
 def resolve_from_provider(provider: BaseProvider, req: Requirement):
@@ -1045,12 +1059,14 @@ def resolve_from_provider(provider: BaseProvider, req: Requirement):
     # This calls provider.find_matches() to get candidates
     result = rslvr.resolve([req])
 
-    # Extract result (line ~171)
+    # Extract result
     for candidate in result.mapping.values():
         return candidate.url, candidate.version
 ```
 
-**Provider's find_matches**: `src/fromager/resolver.py` line ~524 `PyPIProvider.find_matches()`
+**Provider's find_matches**: `src/fromager/resolver.py` `BaseProvider.find_matches()`
+
+`PyPIProvider` inherits `find_matches()` from `BaseProvider`, which handles caching, filtering, and sorting:
 
 ```python
 def find_matches(
@@ -1058,26 +1074,20 @@ def find_matches(
     identifier: str,
     requirements: RequirementsMap,
     incompatibilities: CandidatesMap,
-) -> typing.Iterable[Candidate]:
-    # Try cache first (line ~530)
-    candidates = self.get_from_cache(identifier, requirements, incompatibilities)
+) -> Candidates:
+    # Get candidates (cached internally via _find_cached_candidates)
+    unfiltered_candidates = self._find_cached_candidates(identifier)
 
-    if not candidates:
-        # Get from PyPI (line ~535)
-        for candidate in get_project_from_pypi(
-            identifier,
-            set(),
-            self.sdist_server_url,
-            self.ignore_platform,
-        ):
-            # Validate against requirements and constraints (line ~541)
-            if self.validate_candidate(identifier, requirements, incompatibilities, candidate):
-                candidates.append(candidate)
+    # Filter by requirements and constraints
+    candidates = [
+        candidate
+        for candidate in unfiltered_candidates
+        if self.validate_candidate(
+            identifier, requirements, incompatibilities, candidate
+        )
+    ]
 
-        # Cache it (line ~545)
-        self.add_to_cache(identifier, candidates)
-
-    # Return sorted by version descending (line ~571)
+    # Return sorted by version descending
     return sorted(candidates, key=attrgetter("version", "build_tag"), reverse=True)
 ```
 
@@ -1098,7 +1108,7 @@ def resolve_source(ctx, req, sdist_server_url, req_type):
     return "https://github.com/pytorch/pytorch/releases/...", Version("2.0.0")
 ```
 
-**How It's Called**: `src/fromager/sources.py` line ~122
+**How It's Called**: `src/fromager/sources.py`
 
 ```python
 # In resolve_source()
@@ -1113,7 +1123,7 @@ resolver_results = overrides.find_and_invoke(
 )
 ```
 
-**Override Lookup**: `src/fromager/overrides.py` line ~40
+**Override Lookup**: `src/fromager/overrides.py`
 
 ```python
 def find_and_invoke(
@@ -1122,15 +1132,15 @@ def find_and_invoke(
     default_fn: typing.Callable,
     **kwargs: typing.Any,
 ) -> typing.Any:
-    # Look for override (line ~46)
+    # Look for override
     fn = find_override_method(distname, method)
     if not fn:
         fn = default_fn  # Use default if no override
 
-    # Invoke it (line ~50)
+    # Invoke it
     result = invoke(fn, **kwargs)
 
-    # Log (line ~51)
+    # Log
     if fn is default_fn:
         logger.debug(f"{distname}: override method {fn.__name__} returned {result}")
     else:
@@ -1139,24 +1149,24 @@ def find_and_invoke(
     return result
 ```
 
-**Finding Override**: `src/fromager/overrides.py` line ~115
+**Finding Override**: `src/fromager/overrides.py`
 
 ```python
 def find_override_method(distname: str, method: str) -> typing.Callable | None:
-    # Convert name (line ~122)
+    # Convert name
     distname = pkgname_to_override_module(distname)  # torch -> torch
 
-    # Load module via stevedore (line ~124)
+    # Load module via stevedore
     try:
         mod = _get_extensions()[distname].plugin
     except KeyError:
         return None  # No override module
 
-    # Check if method exists (line ~132)
+    # Check if method exists
     if not hasattr(mod, method):
         return None  # Module exists but not this method
 
-    # Return the function (line ~136)
+    # Return the function
     return getattr(mod, method)
 ```
 
@@ -1176,7 +1186,7 @@ variants:
       USE_CUDA: "1"
 ```
 
-**Loading**: `src/fromager/packagesettings.py` line ~886 `Settings.from_files()`
+**Loading**: `src/fromager/packagesettings.py` `Settings.from_files()`
 
 ```python
 @classmethod
@@ -1188,17 +1198,17 @@ def from_files(
     variant: str,
     max_jobs: int | None,
 ) -> Settings:
-    # Load global settings (line ~902)
+    # Load global settings
     settings = SettingsFile.from_file(settings_file) if settings_file.exists() else SettingsFile()
 
-    # Load per-package settings (line ~910)
+    # Load per-package settings
     package_settings: list[PackageSettings] = []
     if settings_dir.exists():
         for yaml_file in sorted(settings_dir.glob("*.yaml")):
             pkg_settings = PackageSettings.from_yaml(yaml_file)
             package_settings.append(pkg_settings)
 
-    # Create Settings object (line ~920)
+    # Create Settings object
     return cls(
         settings=settings,
         package_settings=package_settings,
@@ -1208,7 +1218,7 @@ def from_files(
     )
 ```
 
-**Accessing**: `src/fromager/context.py` line ~160
+**Accessing**: `src/fromager/context.py`
 
 ```python
 def package_build_info(
@@ -1219,7 +1229,7 @@ def package_build_info(
     else:
         name = package
 
-    # Delegates to settings (line ~167)
+    # Delegates to settings
     return self.settings.package_build_info(name)
 ```
 
@@ -1235,58 +1245,45 @@ if pbi.pre_built:
     ...
 
 download_url = pbi.download_source_url(version=version)
-extra_env = pbi.extra_environ
+extra_env = pbi.get_extra_environ(build_env=build_env, version=version)
 ```
 
-**PackageBuildInfo**: `src/fromager/packagesettings.py` line ~960
+**PackageBuildInfo**: `src/fromager/packagesettings.py`
 
 ```python
 class PackageBuildInfo:
-    def __init__(
-        self,
-        name: Package,
-        variant: Variant,
-        per_package: PerPackage,      # From torch.yaml
-        global_cfg: SettingsFile,      # From settings.yaml
-    ):
-        self._name = name
-        self._variant = variant
-        self._per_package = per_package
-        self._global_cfg = global_cfg
+    def __init__(self, settings: Settings, ps: PackageSettings) -> None:
+        self._variant = settings.variant
+        self._patches_dir = settings.patches_dir
+        self._max_jobs = settings.max_jobs
+        self._ps = ps                            # Per-package settings (from YAML)
 
-    # Computed properties with fallbacks
     @property
     def pre_built(self) -> bool:
-        # Check variant first, then package, then global
-        if self._per_package.variants and self._variant in self._per_package.variants:
-            if self._per_package.variants[self._variant].pre_built is not None:
-                return self._per_package.variants[self._variant].pre_built
-        if self._per_package.pre_built is not None:
-            return self._per_package.pre_built
-        return self._global_cfg.pre_built
+        """Does the variant use pre-built wheels?"""
+        vi = self._ps.variants.get(self.variant)
+        if vi is not None:
+            return vi.pre_built
+        return False
 
-    @property
-    def extra_environ(self) -> dict[str, str]:
-        # Merge global + package + variant
-        result = {}
-        result.update(self._global_cfg.env)
-        result.update(self._per_package.env)
-        if self._per_package.variants and self._variant in self._per_package.variants:
-            result.update(self._per_package.variants[self._variant].env)
-        return result
+    def get_extra_environ(self, ...) -> dict[str, str]:
+        # Sets MAKEFLAGS, CMAKE_BUILD_PARALLEL_LEVEL, MAX_JOBS
+        # Merges package env + variant env with template variable resolution
+        # Handles VIRTUAL_ENV and PATH from build environment
+        ...
 ```
 
 ## Command to Code Mapping
 
 | User Command | Entry Point | Key Functions Called | Output |
 |-------------|-------------|---------------------|---------|
-| `fromager bootstrap requests` | `commands/bootstrap.py:bootstrap()` (line ~100) | `Bootstrapper.bootstrap()` -> recursive dependency resolution | `wheels-repo/simple/`, `work-dir/graph.json`, `work-dir/build-order.json` |
-| `fromager build requests 2.31.0` | `commands/build.py:build()` (line ~81) | `build_one()` -> `build_sdist()` + `build_wheel()` | Single sdist + wheel |
-| `fromager build-sequence` | `commands/build.py:build_sequence()` (line ~163) | Reads `build-order.json`, calls `build_one()` for each | All wheels in order |
-| `fromager graph why requests` | `commands/graph.py:graph()` (line ~52) -> `find_why()` (line ~158) | `DependencyGraph.get_nodes_by_name()` | Dependency chain explanation |
-| `fromager list-overrides` | `commands/list_overrides.py:list_overrides()` (line ~8) | `overrides._get_extensions()` | List of available override modules |
-| `fromager canonicalize My-Package` | `commands/canonicalize.py:canonicalize()` (line ~12) | `canonicalize_name()` | `my-package` |
-| `fromager stats` | `commands/stats.py:stats()` (line ~9) | `metrics.format_time_stats()` | Timing breakdown per package |
+| `fromager bootstrap requests` | `commands/bootstrap.py:bootstrap()` | `Bootstrapper.bootstrap()` -> recursive dependency resolution | `wheels-repo/simple/`, `work-dir/graph.json`, `work-dir/build-order.json` |
+| `fromager build requests 2.31.0` | `commands/build.py:build()` | `build_one()` -> `build_sdist()` + `build_wheel()` | Single sdist + wheel |
+| `fromager build-sequence` | `commands/build.py:build_sequence()` | Reads `build-order.json`, calls `build_one()` for each | All wheels in order |
+| `fromager graph why requests` | `commands/graph.py:graph()` -> `find_why()` | `DependencyGraph.get_nodes_by_name()` | Dependency chain explanation |
+| `fromager list-overrides` | `commands/list_overrides.py:list_overrides()` | `overrides._get_extensions()` | List of available override modules |
+| `fromager canonicalize My-Package` | `commands/canonicalize.py:canonicalize()` | `overrides.pkgname_to_override_module()` | `my_package` |
+| `fromager stats` | `commands/stats.py:stats()` | `metrics.format_time_stats()` | Timing breakdown per package |
 
 ## Module Dependency Map
 
@@ -1343,7 +1340,7 @@ Utilities
 
 ### Adding Support for a New Package Source
 
-1. **Create new provider class** in `resolver.py` (after line ~805)
+1. **Create new provider class** in `resolver.py`
    - Inherit from `GenericProvider`
    - Implement `_find_tags()` method
    - Add caching
@@ -1360,7 +1357,7 @@ Utilities
 
 1. **Add method** to `Bootstrapper` class in `bootstrapper.py`
 2. **Call it** from `bootstrap()` method at appropriate point
-3. **Add to step command** in `commands/step.py` (line ~61)
+3. **Add to step command** in `commands/step.py`
 
 ### Adding a New Package Setting
 

@@ -60,7 +60,7 @@ The `RequirementResolver` (`requirement_resolver.py`) was extracted from the Boo
 - **Session-Level Cache** -- Maintains a resolution cache across the session to avoid redundant lookups
 - **Pre-built Wheel Handling** -- Determines whether a package uses a pre-built wheel or needs source building
 - **Source Type Classification** -- Classifies requirements as `PREBUILT`, `SDIST`, `OVERRIDE`, or `GIT` via the `SourceType` enum
-- **Key Methods** -- `resolve()`, `_resolve_from_graph()`, `_resolve_from_version_source()`
+- **Key Methods** -- `resolve()`, `_resolve()` (internal dispatcher), `_resolve_from_graph()`, `_resolve_from_version_source()`
 
 ### 4. Resolver -- Version Selection Intelligence
 
@@ -291,7 +291,7 @@ Plugin system using stevedore (namespace: `fromager.project_overrides`):
 - Methods override default implementations for any operation
 - Flexible argument filtering for cross-version compatibility
 
-Override methods: `get_build_system_dependencies`, `get_build_backend_dependencies`, `get_build_sdist_dependencies`, `get_resolver_provider`, `download_source`, `resolve_source`, `build_sdist`, `build_wheel`, `add_extra_metadata_to_wheels`.
+Override methods: `get_build_system_dependencies`, `get_build_backend_dependencies`, `get_build_sdist_dependencies`, `get_install_dependencies_of_sdist`, `get_resolver_provider`, `download_source`, `resolve_source`, `prepare_source`, `expected_source_archive_name`, `build_sdist`, `build_wheel`, `add_extra_metadata_to_wheels`, `update_extra_environ`.
 
 **Hooks** (`hooks.py`)
 
