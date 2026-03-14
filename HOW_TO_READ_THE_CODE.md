@@ -60,34 +60,15 @@ Fromager's architecture centers around **five core components** that work in har
 
 ### Component Overview
 
-```
-User Command
-    |
-    v
-Click Command (commands/*.py)
-    |
-    v
-┌─────────────────────────────────────────────────────────────┐
-│                    WorkContext                              │
-│                 (Central Coordination)                      │
-│  • Tracks all state and configuration                      │
-│  • Coordinates between other components                     │
-│  • Manages file paths, caches, and resources              │
-└─────────────────┬───────────────────────────────────────────┘
-                  │
-    ┌─────────────┼──────────────────────────┐
-    │             │             │             │
-    v             v             v             v
-┌──────────────┐ ┌───────────────────┐ ┌─────────┐ ┌─────────────┐
-│Bootstrapper  │ │RequirementResolver│ │Resolver │ │BuildEnvironment│
-│(Orchestration)│ │(Resolution Logic) │ │(Version │ │(Isolation)     │
-│• Dependency  │ │• Graph-based      │ │Selection)│ │• Virtual envs  │
-│  discovery   │ │  resolution       │ │• Constraint│ │• Dependency    │
-│• Build order │ │• PyPI fallback    │ │  satisfaction│ │  installation  │
-│• Recursion   │ │• Session cache    │ │• Provider  │ │• Command       │
-│  management  │ │• Source type      │ │  strategies│ │  execution     │
-└──────────────┘ │  classification   │ └─────────┘ └─────────────┘
-                 └───────────────────┘
+```mermaid
+flowchart TD
+    A["User Command"] --> B["Click Command (commands/*.py)"]
+    B --> C["WORKCONTEXT<br/>(Central Coordination)<br/>State - Configuration - Paths - Caches"]
+
+    C --> D["BOOTSTRAPPER<br/>(Orchestration)<br/>Dependency discovery - Build order - Recursion"]
+    C --> E["REQUIREMENT RESOLVER<br/>(Resolution Logic)<br/>Graph-based resolution - PyPI fallback<br/>Session cache - Source type classification"]
+    C --> F["RESOLVER<br/>(Version Selection)<br/>Constraint satisfaction - Provider strategies"]
+    C --> G["BUILD ENVIRONMENT<br/>(Isolation)<br/>Virtual envs - Dependency installation<br/>Command execution"]
 ```
 
 ### 1. WorkContext - Central Coordination
@@ -234,21 +215,14 @@ class BuildEnvironment:
 
 The five components work together in a coordinated cycle:
 
-```
-1. WorkContext orchestrates the overall process
-   ↓
-2. Bootstrapper discovers what needs to be built
-   ↓
-3. RequirementResolver coordinates version resolution
-   (graph-based first, then PyPI fallback)
-   ↓
-4. Resolver selects the best version from providers (PyPI, GitHub, GitLab)
-   ↓
-5. BuildEnvironment executes the actual builds
-   ↓
-6. WorkContext updates state and determines next steps
-   ↓
-   (cycle repeats for dependencies)
+```mermaid
+flowchart TD
+    A["1. WorkContext orchestrates the overall process"] --> B["2. Bootstrapper discovers what needs to be built"]
+    B --> C["3. RequirementResolver coordinates version resolution<br/>(graph-based first, then PyPI fallback)"]
+    C --> D["4. Resolver selects the best version<br/>(PyPI, GitHub, GitLab providers)"]
+    D --> E["5. BuildEnvironment executes the actual builds"]
+    E --> F["6. WorkContext updates state and determines next steps"]
+    F -->|"cycle repeats for dependencies"| A
 ```
 
 This **harmonious interaction** ensures that:
@@ -389,30 +363,26 @@ class Bootstrapper:
 - `_build_stack`: Maintains build order
 
 **Example Flow**:
-```
-bootstrap(requests)
-  |
-  +-> resolve_version(requests) -> requests==2.31.0
-  |
-  +-> _bootstrap_impl(requests, 2.31.0)
-  |     |
-  |     +-> _download_source(requests, 2.31.0)
-  |     |     +-> sources.resolve_source() -> URL
-  |     |     +-> sources.download_source() -> tar.gz file
-  |     |
-  |     +-> _handle_build_requirements(requests)
-  |     |     +-> dependencies.get_build_system_dependencies()
-  |     |     +-> bootstrap(setuptools) [recursive!]
-  |     |     +-> bootstrap(wheel) [recursive!]
-  |     |
-  |     +-> _build_from_source(requests, 2.31.0)
-  |     |     +-> build sdist and wheel
-  |     |
-  |     +-> handle install dependencies (inline in _bootstrap_impl)
-  |           +-> self._get_install_dependencies()
-        +-> bootstrap(urllib3) [recursive!]
-        +-> bootstrap(charset-normalizer) [recursive!]
-        +-> ...
+```mermaid
+flowchart TD
+    A["bootstrap(requests)"] --> B["resolve_version(requests)<br/>-> requests==2.31.0"]
+    B --> C["_bootstrap_impl(requests, 2.31.0)"]
+    C --> D["_download_source(requests, 2.31.0)"]
+    D --> D1["sources.resolve_source() -> URL"]
+    D --> D2["sources.download_source() -> tar.gz file"]
+    C --> E["_handle_build_requirements(requests)"]
+    E --> E1["dependencies.get_build_system_dependencies()"]
+    E --> E2["bootstrap(setuptools)"]
+    E --> E3["bootstrap(wheel)"]
+    E2 -->|"recursive"| A
+    E3 -->|"recursive"| A
+    C --> F["_build_from_source(requests, 2.31.0)<br/>build sdist and wheel"]
+    C --> G["handle install dependencies<br/>self._get_install_dependencies()"]
+    G --> G1["bootstrap(urllib3)"]
+    G --> G2["bootstrap(charset-normalizer)"]
+    G --> G3["..."]
+    G1 -->|"recursive"| A
+    G2 -->|"recursive"| A
 ```
 
 ### DependencyGraph: Relationship Tracker
@@ -487,15 +457,13 @@ def _add_to_graph(self, req, req_type, resolved_version, source_url):
 ```
 
 **Graph Structure**:
-```
-ROOT
-  |
-  +--[toplevel]--> requests==2.31.0
-                      |
-                      +--[build-system]--> setuptools==68.0.0
-                      +--[build-system]--> wheel==0.41.0
-                      +--[install]-------> urllib3==2.0.4
-                      +--[install]-------> charset-normalizer==3.2.0
+```mermaid
+graph TD
+    ROOT -->|toplevel| requests["requests==2.31.0"]
+    requests -->|build-system| setuptools["setuptools==68.0.0"]
+    requests -->|build-system| wheel["wheel==0.41.0"]
+    requests -->|install| urllib3["urllib3==2.0.4"]
+    requests -->|install| charset["charset-normalizer==3.2.0"]
 ```
 
 ### Resolver: Version Selection
@@ -555,23 +523,17 @@ ROOT
    - Similar to GitHub but uses GitLab API
 
 **Example Flow**:
-```python
-# User has: requests>=2.28.0
-# Constraints: requests<2.32
-
-resolve(req=Requirement("requests>=2.28.0"))
-  |
-  +-> PyPIProvider.find_matches("requests")
-  |     +-> Fetch https://pypi.org/simple/requests/
-  |     +-> Parse available versions: 2.28.0, 2.28.1, 2.29.0, 2.31.0, 2.32.0, ...
-  |     +-> Filter by req.specifier: >=2.28.0 -> keeps 2.28.0+
-  |     +-> Filter by constraints: <2.32 -> removes 2.32.0+
-  |     +-> Sort descending: [2.31.0, 2.29.0, 2.28.1, 2.28.0]
-  |     +-> Return candidates
-  |
-  +-> resolvelib picks highest: 2.31.0
-  |
-  +-> Return (url_to_2.31.0, Version("2.31.0"))
+```mermaid
+flowchart TD
+    A["resolve(req=Requirement('requests>=2.28.0'))"] --> B["PyPIProvider.find_matches('requests')"]
+    B --> B1["Fetch https://pypi.org/simple/requests/"]
+    B1 --> B2["Parse available versions:<br/>2.28.0, 2.28.1, 2.29.0, 2.31.0, 2.32.0, ..."]
+    B2 --> B3["Filter by req.specifier: >=2.28.0<br/>keeps 2.28.0+"]
+    B3 --> B4["Filter by constraints: less than 2.32<br/>removes 2.32.0+"]
+    B4 --> B5["Sort descending:<br/>2.31.0, 2.29.0, 2.28.1, 2.28.0"]
+    B5 --> B6["Return candidates"]
+    B6 --> C["resolvelib picks highest: 2.31.0"]
+    C --> D["Return (url_to_2.31.0, Version('2.31.0'))"]
 ```
 
 ### BuildEnvironment: Isolated Builds
@@ -645,27 +607,14 @@ resolve(req=Requirement("requests>=2.28.0"))
    ```
 
 **Lifecycle**:
-```
-Build Package X
-  |
-  +-> BuildEnvironment(work-dir/X/build-3.12)
-  |     +-> Create virtualenv
-  |
-  +-> Install build-system deps
-  |     +-> build_env.install([setuptools, wheel])
-  |     |     +-> uv pip install --index-url http://localhost:8000/simple/
-  |
-  +-> Install build-backend deps
-  |     +-> build_env.install([additional deps])
-  |
-  +-> Build sdist
-  |     +-> build_env.run([python, -m, build, --sdist])
-  |
-  +-> Build wheel
-  |     +-> build_env.run([python, -m, build, --wheel])
-  |
-  +-> Cleanup (if configured)
-        +-> Delete virtualenv
+```mermaid
+flowchart TD
+    A["Build Package X"] --> B["BuildEnvironment<br/>(work-dir/X/build-3.12)<br/>Create virtualenv"]
+    B --> C["Install build-system deps<br/>build_env.install([setuptools, wheel])<br/>uv pip install --index-url localhost:8000/simple/"]
+    C --> D["Install build-backend deps<br/>build_env.install([additional deps])"]
+    D --> E["Build sdist<br/>build_env.run([python, -m, build, --sdist])"]
+    E --> F["Build wheel<br/>build_env.run([python, -m, build, --wheel])"]
+    F --> G["Cleanup (if configured)<br/>Delete virtualenv"]
 ```
 
 ### Dependencies: Requirement Extraction
@@ -1289,45 +1238,13 @@ class PackageBuildInfo:
 
 Understanding which modules depend on which helps navigate the code:
 
-```
-High Level (Commands)
-  commands/*.py
-    |
-    v
-Mid Level (Orchestration)
-  bootstrapper.py
-  requirement_resolver.py
-  context.py
-    |
-    v
-Core Operations
-  resolver.py
-  sources.py
-  wheels.py
-  dependencies.py
-  build_environment.py
-  pkgmetadata/           (PEP 639 license detection, PEP 753 URL normalization)
-    |
-    v
-Customization
-  overrides.py
-  hooks.py               (post_build, post_bootstrap, prebuilt_wheel)
-  packagesettings.py
-    |
-    v
-Data Structures
-  dependency_graph.py
-  constraints.py
-  requirements_file.py   (includes SourceType enum: PREBUILT, SDIST, OVERRIDE, GIT)
-    |
-    v
-Utilities
-  external_commands.py
-  run_network_isolation.sh
-  finders.py
-  http_retry.py
-  gitutils.py
-  etc.
+```mermaid
+flowchart TD
+    A["High Level (Commands)<br/>commands/*.py"] --> B["Mid Level (Orchestration)<br/>bootstrapper.py<br/>requirement_resolver.py<br/>context.py"]
+    B --> C["Core Operations<br/>resolver.py, sources.py, wheels.py<br/>dependencies.py, build_environment.py<br/>pkgmetadata/ (PEP 639, PEP 753)"]
+    C --> D["Customization<br/>overrides.py<br/>hooks.py (post_build, post_bootstrap, prebuilt_wheel)<br/>packagesettings.py"]
+    D --> E["Data Structures<br/>dependency_graph.py, constraints.py<br/>requirements_file.py (SourceType: PREBUILT, SDIST, OVERRIDE, GIT)"]
+    E --> F["Utilities<br/>external_commands.py, run_network_isolation.sh<br/>finders.py, http_retry.py, gitutils.py, etc."]
 ```
 
 **Import Rules**:

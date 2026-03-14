@@ -1,0 +1,33 @@
+name: Validate Mermaid diagrams
+
+on:
+  pull_request:
+    paths:
+      - '**.md'
+  push:
+    branches: [main]
+    paths:
+      - '**.md'
+
+jobs:
+  validate-mermaid:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Mermaid CLI
+        run: npm install -g @mermaid-js/mermaid-cli@11.12.0
+
+      - name: Create Puppeteer config
+        run: echo '{"args":["--no-sandbox"]}' > /tmp/puppeteer-config.json
+
+      - name: Validate Mermaid diagrams
+        run: bash ./scripts/validate-mermaid.sh
+        env:
+          PUPPETEER_CONFIG: /tmp/puppeteer-config.json

@@ -82,23 +82,14 @@ The `BuildEnvironment` (`build_environment.py`) provides clean, reproducible bui
 
 ### Component Interaction Flow
 
-```
-WorkContext (orchestrates)
-    |
-    v
-Bootstrapper (discovers dependencies)
-    |
-    v
-RequirementResolver (resolves individual requirements)
-    |
-    v
-Resolver (selects versions)
-    |
-    v
-BuildEnvironment (executes builds)
-    |
-    v
-WorkContext (updates state, determines next steps)
+```mermaid
+flowchart TD
+    A["WorkContext (orchestrates)"] --> B["Bootstrapper (discovers dependencies)"]
+    B --> C["RequirementResolver (resolves individual requirements)"]
+    C --> D["Resolver (selects versions)"]
+    D --> E["BuildEnvironment (executes builds)"]
+    E --> F["WorkContext (updates state, determines next steps)"]
+    F -->|"repeats for each dependency"| B
 ```
 
 This flow ensures consistent state, correct resolution order, isolated builds, and trackable progress.
@@ -385,62 +376,41 @@ Commands are Click plugins loaded via stevedore (`fromager.cli` namespace).
 
 ### Bootstrap Process
 
-```
-User Requirements
-    |
-    v
-Pre-Resolution Phase (resolve top-level deps, prepare constraints)
-    |
-    v
-RequirementResolver (classify source type, check pre-built)
-    |
-    v
-Resolver (version selection)
-    |
-    v
-Source Download/Clone
-    |
-    v
-Build System Dependencies ----> Recursive Bootstrap
-    |
-    v
-Build Backend Dependencies ---> Recursive Bootstrap
-    |
-    v
-Build Sdist Dependencies -----> Recursive Bootstrap
-    |
-    v
-Build Sdist + Wheel
-    |
-    v
-Install Dependencies ---------> Recursive Bootstrap
-    |
-    v
-Update Dependency Graph
-    |
-    v
-Finalization Phase (write graph, build order, failure report)
+```mermaid
+flowchart TD
+    A["User Requirements"] --> B["Pre-Resolution Phase<br/>(resolve top-level deps, prepare constraints)"]
+    B --> C["RequirementResolver<br/>(classify source type, check pre-built)"]
+    C --> D["Resolver (version selection)"]
+    D --> E["Source Download/Clone"]
+    E --> F["Build System Dependencies"]
+    F -->|"Recursive Bootstrap"| C
+    F --> G["Build Backend Dependencies"]
+    G -->|"Recursive Bootstrap"| C
+    G --> H["Build Sdist Dependencies"]
+    H -->|"Recursive Bootstrap"| C
+    H --> I["Build Sdist + Wheel"]
+    I --> J["Install Dependencies"]
+    J -->|"Recursive Bootstrap"| C
+    J --> K["Update Dependency Graph"]
+    K --> L["Finalization Phase<br/>(write graph, build order, failure report)"]
 ```
 
 ### Build Process (from graph)
 
-```
-Dependency Graph
-    |
-    v
-Build Order Computation
-    |
-    v
-For each package in order:
-    +-> Source Download
-    +-> Apply Patches/Overrides
-    +-> Build Environment Setup
-    +-> Install Build Dependencies (from cache)
-    +-> Build Sdist
-    +-> Build Wheel
-    +-> Add Extra Metadata
-    +-> Update Repository
-    +-> Run Hooks
+```mermaid
+flowchart TD
+    A["Dependency Graph"] --> B["Build Order Computation"]
+    B --> C{{"For each package in order"}}
+    C --> D["Source Download"]
+    D --> E["Apply Patches/Overrides"]
+    E --> F["Build Environment Setup"]
+    F --> G["Install Build Dependencies (from cache)"]
+    G --> H["Build Sdist"]
+    H --> I["Build Wheel"]
+    I --> J["Add Extra Metadata"]
+    J --> K["Update Repository"]
+    K --> L["Run Hooks"]
+    L -->|"next package"| C
 ```
 
 ---
